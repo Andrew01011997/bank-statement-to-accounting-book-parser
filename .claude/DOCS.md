@@ -1,4 +1,4 @@
-# Документація проекту KUS (Книга Обліку Доходів)
+# Документація проекту Bank Statement to Accounting Book Parser
 
 Парсер банківських виписок PDF для автоматичної генерації Книги обліку доходів.
 
@@ -56,7 +56,7 @@
 ## Структура файлів
 
 ```
-kus/
+bank-statement-to-accounting-book-parser/
 ├── main.py                 # Точка входу
 ├── run.sh / run.bat        # Скрипти запуску
 ├── requirements.txt        # Залежності (pdfplumber)
