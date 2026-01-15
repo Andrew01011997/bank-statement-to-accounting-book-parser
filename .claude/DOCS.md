@@ -47,6 +47,7 @@
 │                                                              │
 │  ├── MonobankParser                                          │
 │  ├── PrivatBankParser                                        │
+│  ├── NovaPayParser                                           │
 │  └── GenericParser                                           │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -77,6 +78,7 @@ bank-statement-to-accounting-book-parser/
     │   ├── __init__.py
     │   ├── monobank_parser.py
     │   ├── privatbank_parser.py
+    │   ├── novapay_parser.py
     │   └── generic_parser.py
     │
     ├── io/                 # Читання/запис файлів
@@ -167,6 +169,7 @@ def main():
 - Шукає ключові слова з `constants.py`:
   - `monobank`, `універсал банк` → MonobankParser
   - `приватбанк` → PrivatBankParser
+  - `novapay`, `новапей`, `935871` → NovaPayParser
   - інше → GenericParser
 
 ---
@@ -231,6 +234,29 @@ def main():
 - Шукає колонки: `дата час`, `сума операц`
 - Контрольна сума: `Обіг за кредитом за період: XXX UAH`
 - Уникає колонки "Сума у валюті рахунку"
+
+---
+
+### `parser/parsers/novapay_parser.py`
+
+**Призначення:** Парсер для виписок NovaPay (небанківський платіжний сервіс).
+
+**Клас:** `NovaPayParser` extends `BaseParser`
+
+**Методи:**
+
+| Метод | Опис |
+|-------|------|
+| `_extract_date_novapay(date_str)` | Парсинг дати без секунд (`dd.mm.yyyy HH:MM`) |
+| `_extract_amount_novapay(amount_str)` | Парсинг суми з комою (`1 234,56`) |
+| `extract_control_sum(pdf)` | Витягує "Обороти по кредиту" з останньої сторінки |
+| `parse(pdf)` | Основний метод парсингу |
+
+**Особливості:**
+- Формат дати: `01.07.2025 10:30` (без секунд)
+- Формат суми: `1 234,56` (кома як десятковий, пробіл як тисячний)
+- Контрольна сума: `Обороти по кредиту: XXX грн`
+- Шукає колонки: `Дата/час операц`, `Сума, UAH`
 
 ---
 
@@ -303,12 +329,16 @@ with PDFReader.open('file.pdf') as pdf:
 |-------|------|
 | `DATE_PATTERN` | Regex для дати `dd.mm.yyyy` |
 | `TIME_PATTERN` | Regex для часу `hh:mm:ss` |
-| `DATETIME_PATTERN` | Regex для дати+часу |
-| `AMOUNT_PATTERN` | Regex для суми |
+| `TIME_PATTERN_SHORT` | Regex для часу без секунд `hh:mm` |
+| `DATETIME_PATTERN` | Regex для дати+часу з секундами |
+| `DATETIME_PATTERN_SHORT` | Regex для дати+часу без секунд (NovaPay) |
+| `AMOUNT_PATTERN` | Regex для суми з крапкою |
+| `AMOUNT_PATTERN_COMMA` | Regex для суми з комою (NovaPay) |
 | `WHITESPACE_PATTERN` | Regex для пробілів (включаючи nbsp) |
 | `MIN_AMOUNT` / `MAX_AMOUNT` | Межі валідних сум |
 | `MONOBANK_KEYWORDS` | Ключові слова Монобанку |
 | `PRIVATBANK_KEYWORDS` | Ключові слова ПриватБанку |
+| `NOVAPAY_KEYWORDS` | Ключові слова NovaPay |
 | `MINUS_SIGNS` | Різні Unicode символи мінуса |
 | `CSV_ENCODING` | `utf-8-sig` |
 
@@ -372,12 +402,12 @@ input/statement.pdf
         │
         ▼
 ┌───────────────────┐
-│  BankDetector     │ ← Визначає: monobank | privatbank | unknown
+│  BankDetector     │ ← Визначає: monobank | privatbank | novapay | unknown
 └─────────┬─────────┘
           │
           ▼ (створює)
 ┌───────────────────┐
-│  MonobankParser   │ ← або PrivatBankParser / GenericParser
+│  Parser           │ ← MonobankParser / PrivatBankParser / NovaPayParser / GenericParser
 └─────────┬─────────┘
           │
           ▼ (парсить)
@@ -435,6 +465,7 @@ if any(keyword in text_lower for keyword in constants.NEWBANK_KEYWORDS):
 parsers = {
     'monobank': MonobankParser,
     'privatbank': PrivatBankParser,
+    'novapay': NovaPayParser,
     'newbank': NewBankParser,  # ← додати
     'unknown': GenericParser
 }
