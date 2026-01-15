@@ -7,6 +7,7 @@ import pdfplumber
 from .core.base_parser import BaseParser
 from .parsers.monobank_parser import MonobankParser
 from .parsers.privatbank_parser import PrivatBankParser
+from .parsers.novapay_parser import NovaPayParser
 from .parsers.generic_parser import GenericParser
 from .utils import constants
 
@@ -23,7 +24,7 @@ class BankDetector:
             pdf_path: Шлях до PDF файлу
 
         Returns:
-            'monobank' | 'privatbank' | 'unknown'
+            'monobank' | 'privatbank' | 'novapay' | 'unknown'
         """
         try:
             with pdfplumber.open(pdf_path) as pdf:
@@ -40,6 +41,10 @@ class BankDetector:
                     if any(keyword in text_lower for keyword in constants.PRIVATBANK_KEYWORDS):
                         return 'privatbank'
 
+                    # Перевіряємо NovaPay
+                    if any(keyword in text_lower for keyword in constants.NOVAPAY_KEYWORDS):
+                        return 'novapay'
+
         except Exception:
             pass
 
@@ -51,7 +56,7 @@ class BankDetector:
         Повертає відповідний парсер на основі типу банку (Factory Method).
 
         Args:
-            bank_type: 'monobank' | 'privatbank' | 'unknown'
+            bank_type: 'monobank' | 'privatbank' | 'novapay' | 'unknown'
 
         Returns:
             Екземпляр відповідного парсера
@@ -59,6 +64,7 @@ class BankDetector:
         parsers = {
             'monobank': MonobankParser,
             'privatbank': PrivatBankParser,
+            'novapay': NovaPayParser,
             'unknown': GenericParser
         }
 
