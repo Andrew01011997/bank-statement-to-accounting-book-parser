@@ -4,6 +4,14 @@
 """
 
 from datetime import datetime
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..core.statement import Transaction
+
+
+# Заголовки CSV колонок
+CSV_HEADERS = ['Час', 'Дата', 'Сума', 'Комісія', 'Сума з врахуванням комісії']
 
 
 def format_date(date: datetime, fmt: str = '%d.%m.%Y') -> str:
@@ -54,28 +62,33 @@ def format_time(date: datetime) -> str:
     return date.strftime('%H:%M:%S')
 
 
-def format_csv_row(date: datetime, amount: float) -> list:
+def format_csv_row(transaction: 'Transaction') -> list:
     """
-    Генерує рядок CSV.
+    Генерує рядок CSV з транзакції.
 
-    Структура (3 колонки):
+    Структура (5 колонок):
     1. Час
     2. Дата
-    3. Сума, грн
+    3. Сума (gross_amount - до комісії)
+    4. Комісія
+    5. Сума з врахуванням комісії (net_amount - після комісії)
 
     Args:
-        date: Дата та час транзакції
-        amount: Сума транзакції
+        transaction: Транзакція
 
     Returns:
-        Список з 3 елементами для CSV рядка
+        Список з 5 елементами для CSV рядка
     """
-    time_str = format_time(date)
-    date_str = format_date(date)
-    amount_str = format_amount(amount)
+    time_str = format_time(transaction.date)
+    date_str = format_date(transaction.date)
+    gross_str = format_amount(transaction.gross_amount)
+    commission_str = format_amount(transaction.commission)
+    net_str = format_amount(transaction.net_amount)
 
     return [
-        time_str,      # Час
-        date_str,      # Дата
-        amount_str     # Сума
+        time_str,        # Час
+        date_str,        # Дата
+        gross_str,       # Сума
+        commission_str,  # Комісія
+        net_str          # Сума з врахуванням комісії
     ]

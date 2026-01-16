@@ -17,10 +17,12 @@ class CSVWriter:
         """
         Записує транзакції у CSV файл.
 
-        Структура CSV (3 колонки):
+        Структура CSV (5 колонок):
         1. Час
         2. Дата
-        3. Сума, грн
+        3. Сума (gross - до комісії)
+        4. Комісія
+        5. Сума з врахуванням комісії (net - після комісії)
 
         Транзакції записуються у зворотному порядку (reversed).
 
@@ -31,9 +33,12 @@ class CSVWriter:
         with open(output_path, 'w', newline='', encoding=constants.CSV_ENCODING) as csvfile:
             writer = csv.writer(csvfile)
 
+            # Записуємо заголовки
+            writer.writerow(formatters.CSV_HEADERS)
+
             # Записуємо транзакції у зворотному порядку
             for trans in reversed(transactions):
-                row = formatters.format_csv_row(trans.date, trans.amount)
+                row = formatters.format_csv_row(trans)
                 writer.writerow(row)
 
         print(f"CSV файл створено: {output_path}")

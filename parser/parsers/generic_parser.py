@@ -43,10 +43,12 @@ class GenericParser(BaseParser):
                             amount = self._extract_amount(cell)  # Фільтрує негативні!
 
                     # Додаємо транзакцію, якщо знайшли обидва поля
+                    # Generic парсер не підтримує комісію - gross = net
                     if date_obj and amount:
                         transactions.append(Transaction(
                             date=date_obj,
-                            amount=amount
+                            gross_amount=amount,
+                            commission=0.0
                         ))
 
         return transactions

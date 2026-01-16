@@ -3,15 +3,19 @@
 Парсер для виписок Monobank
 """
 
-from typing import List, Optional
+from typing import List, Optional, Tuple
 import re
 from ..core.base_parser import BaseParser
 from ..core.statement import Transaction
-from ..utils.text_parser import TextTransactionParser
+from ..utils import constants
 
 
 class MonobankParser(BaseParser):
     """Парсер для виписок Monobank."""
+
+    def __init__(self):
+        super().__init__()
+        self.saved_details_col = None
 
     def extract_control_sum(self, pdf) -> Optional[float]:
         """
@@ -35,6 +39,44 @@ class MonobankParser(BaseParser):
 
         return None
 
+    def _extract_commission_from_details(self, details: str) -> Tuple[Optional[float], Optional[float]]:
+        """
+        Витягує суму та комісію з колонки "Деталі операції".
+
+        Формат: "Еквайринг, MQ000001, Загалом 1000.00 грн. Комісія банку 13.00 грн."
+
+        Args:
+            details: Текст з деталями операції
+
+        Returns:
+            Tuple (gross_amount, commission) або (None, None) якщо не знайдено
+        """
+        if not details:
+            return None, None
+
+        gross_amount = None
+        commission = None
+
+        # Шукаємо "Загалом X грн"
+        gross_match = re.search(constants.GROSS_AMOUNT_PATTERN, details, re.IGNORECASE)
+        if gross_match:
+            gross_str = gross_match.group(1).replace(' ', '').replace('\xa0', '')
+            try:
+                gross_amount = float(gross_str)
+            except ValueError:
+                pass
+
+        # Шукаємо "Комісія банку X грн"
+        commission_match = re.search(constants.COMMISSION_PATTERN, details, re.IGNORECASE)
+        if commission_match:
+            commission_str = commission_match.group(1).replace(' ', '').replace('\xa0', '')
+            try:
+                commission = float(commission_str)
+            except ValueError:
+                pass
+
+        return gross_amount, commission
+
     def parse(self, pdf) -> List[Transaction]:
         """Парсинг Monobank виписки."""
         transactions = []
@@ -50,6 +92,7 @@ class MonobankParser(BaseParser):
                 header_row_idx = None
                 date_col = self.saved_date_col
                 amount_col = self.saved_amount_col
+                details_col = self.saved_details_col
 
                 for i, row in enumerate(table):
                     if not row:
@@ -64,16 +107,20 @@ class MonobankParser(BaseParser):
                         # Знаходимо індекси колонок
                         indices = self._find_column_indices(row, {
                             'date': ['дата', 'час'],
-                            'amount': ['сума', 'операц']
+                            'amount': ['сума', 'операц'],
+                            'details': ['деталі']
                         })
 
                         date_col = indices.get('date')
                         amount_col = indices.get('amount')
+                        details_col = indices.get('details')
 
                         if date_col is not None:
                             self.saved_date_col = date_col
                         if amount_col is not None:
                             self.saved_amount_col = amount_col
+                        if details_col is not None:
+                            self.saved_details_col = details_col
 
                         break
 
@@ -88,22 +135,40 @@ class MonobankParser(BaseParser):
                         try:
                             date_cell = row[date_col] if date_col < len(row) else None
                             amount_cell = row[amount_col] if amount_col < len(row) else None
+                            details_cell = row[details_col] if details_col is not None and details_col < len(row) else None
 
                             # Якщо немає дати або суми - пропускаємо рядок
-                            # (це може бути продовження рядка з попередньої сторінки)
                             if not date_cell or not amount_cell:
                                 continue
 
-                            # Витягуємо дату/час та суму
+                            # Витягуємо дату/час
                             date_obj = self._extract_date(date_cell)
-                            amount = self._extract_amount(amount_cell)
+                            if not date_obj:
+                                continue
 
-                            # Додаємо транзакцію, якщо дата і сума валідні
-                            if date_obj and amount:
-                                transactions.append(Transaction(
-                                    date=date_obj,
-                                    amount=amount
-                                ))
+                            # Перевіряємо чи є комісія в деталях операції
+                            gross_from_details, commission = self._extract_commission_from_details(details_cell)
+
+                            # Витягуємо суму з колонки "Сума операції"
+                            net_amount = self._extract_amount(amount_cell)
+                            if not net_amount:
+                                continue
+
+                            # Визначаємо gross_amount та commission
+                            if gross_from_details and commission:
+                                # Еквайринг з комісією
+                                gross_amount = gross_from_details
+                            else:
+                                # Звичайний переказ без комісії
+                                gross_amount = net_amount
+                                commission = 0.0
+
+                            transactions.append(Transaction(
+                                date=date_obj,
+                                gross_amount=gross_amount,
+                                commission=commission,
+                                net_amount=net_amount
+                            ))
 
                         except (ValueError, TypeError, IndexError):
                             continue
