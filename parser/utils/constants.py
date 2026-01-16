@@ -13,6 +13,10 @@ AMOUNT_PATTERN = r'(\d+(?:\.\d{2})?)'
 AMOUNT_PATTERN_COMMA = r'([\d\s]+,\d{2})'  # Сума з комою як десятковий (для NovaPay)
 WHITESPACE_PATTERN = r'[\s\xa0\u00a0]'
 
+# Паттерни для еквайрингу (комісії)
+GROSS_AMOUNT_PATTERN = r'Загалом\s+([\d\s]+\.?\d*)\s*грн'  # "Загалом 4000.00 грн"
+COMMISSION_PATTERN = r'Комісія банку\s+([\d\s]+\.?\d*)\s*грн'  # "Комісія банку 52.00 грн"
+
 # Межі сум
 MIN_AMOUNT = 0.01
 MAX_AMOUNT = 100000000

@@ -189,10 +189,12 @@ class NovaPayParser(BaseParser):
                             amount = self._extract_amount_novapay(amount_cell)
 
                             # Додаємо транзакцію, якщо дата і сума валідні
+                            # NovaPay не підтримує комісію - gross = net
                             if date_obj and amount:
                                 transactions.append(Transaction(
                                     date=date_obj,
-                                    amount=amount
+                                    gross_amount=amount,
+                                    commission=0.0
                                 ))
 
                         except (ValueError, TypeError, IndexError):

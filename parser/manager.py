@@ -48,19 +48,26 @@ class StatementParserManager:
                 transactions = parser.parse(pdf)
                 control_sum = parser.extract_control_sum(pdf)
 
-            # 4. Валідація контрольної суми
+            # 4. Валідація контрольної суми (по gross_amount - сума до комісії)
             if control_sum and transactions:
-                actual_sum = sum(t.amount for t in transactions)
+                actual_sum = sum(t.gross_amount for t in transactions)
                 difference = abs(control_sum - actual_sum)
 
                 if difference > 0.01:  # Допускаємо різницю в 1 копійку через округлення
                     print(f"  ⚠️  ПОПЕРЕДЖЕННЯ: Сума транзакцій не співпадає з контрольною сумою!")
                     print(f"      Контрольна сума з виписки: {control_sum:.2f} UAH")
-                    print(f"      Сума розпарсених транзакцій: {actual_sum:.2f} UAH")
+                    print(f"      Сума розпарсених транзакцій (gross): {actual_sum:.2f} UAH")
                     print(f"      Різниця: {difference:.2f} UAH")
                     print(f"      Можливо, деякі транзакції не були розпізнані через формат PDF.")
                 else:
                     print(f"  ✓ Контрольна сума співпадає: {control_sum:.2f} UAH")
+
+                # Додатково виводимо інформацію про комісії
+                total_commission = sum(t.commission for t in transactions)
+                if total_commission > 0:
+                    net_sum = sum(t.net_amount for t in transactions)
+                    print(f"  ℹ️  Загальна комісія: {total_commission:.2f} UAH")
+                    print(f"  ℹ️  Сума після комісії (net): {net_sum:.2f} UAH")
 
             # 5. Генеруємо CSV
             if transactions:
