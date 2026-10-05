@@ -4,12 +4,12 @@
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from datetime import datetime
 import re
 
 from .statement import Transaction
-from ..utils import dates, validators
+from ..utils import constants, dates, validators
 
 
 class BaseParser(ABC):
@@ -27,6 +27,10 @@ class BaseParser(ABC):
     CONTROL_SUM_PAGE: int = 0
     DECIMAL_COMMA: bool = False
     DATE_FORMATS = dates.DEFAULT_FORMATS
+
+    def __init__(self):
+        # Попередження розбору (напр. неузгоджена комісія); виводить менеджер
+        self.warnings: List[str] = []
 
     @abstractmethod
     def parse(self, pdf) -> List[Transaction]:
@@ -74,3 +78,63 @@ class BaseParser(ABC):
             return None
 
         return validators.extract_and_validate_amount(str(amount_str), self.DECIMAL_COMMA)
+
+    def _make_transaction(self, date: datetime, net_amount: float,
+                          details: Optional[str] = None) -> Transaction:
+        """
+        Транзакція з урахуванням комісії з призначення платежу.
+
+        net_amount - сума, що надійшла на рахунок (колонка суми виписки).
+        Якщо в details знайдено суму до комісії та комісію, і вони узгоджені
+        (gross - commission == net), то gross = сума до комісії. Інакше gross = net,
+        а при неузгодженості додається попередження.
+        """
+        gross, commission = self._extract_commission(details)
+
+        if gross is None:
+            if details and re.search(r'ком[iі]с[iі]я', str(details), re.IGNORECASE):
+                self.warnings.append(
+                    f"{date.strftime('%d.%m.%Y %H:%M')}: в описі є комісія, але формат не розпізнано; "
+                    f"записано зараховану суму {net_amount:.2f}"
+                )
+            return Transaction(date=date, gross_amount=net_amount, net_amount=net_amount)
+
+        if abs(gross - commission - net_amount) > constants.CONTROL_SUM_TOLERANCE:
+            self.warnings.append(
+                f"{date.strftime('%d.%m.%Y %H:%M')}: сума {gross:.2f} - комісія {commission:.2f} "
+                f"!= зараховано {net_amount:.2f}; комісію не враховано"
+            )
+            return Transaction(date=date, gross_amount=net_amount, net_amount=net_amount)
+
+        return Transaction(date=date, gross_amount=gross, commission=commission, net_amount=net_amount)
+
+    @staticmethod
+    def _extract_commission(details: Optional[str]) -> Tuple[Optional[float], Optional[float]]:
+        """
+        Сума до комісії та комісія з призначення платежу.
+
+        Формати:
+            "(сума 1 234,56 грн , комiсiя - 9,99 грн.)" - переказ від платіжної системи
+            "Загалом 4000.00 грн. Комісія банку 52.00 грн." - еквайринг Monobank
+
+        Returns:
+            (gross, commission) або (None, None), якщо комісії немає
+        """
+        if not details:
+            return None, None
+
+        text = ' '.join(str(details).split())
+        try:
+            match = re.search(constants.TRANSFER_COMMISSION_PATTERN, text, re.IGNORECASE)
+            if match:
+                return (validators.to_float(match.group(1), decimal_comma=True),
+                        validators.to_float(match.group(2), decimal_comma=True))
+
+            gross = re.search(constants.GROSS_AMOUNT_PATTERN, text, re.IGNORECASE)
+            commission = re.search(constants.COMMISSION_PATTERN, text, re.IGNORECASE)
+            if gross and commission:
+                return validators.to_float(gross.group(1)), validators.to_float(commission.group(1))
+        except ValueError:
+            pass
+
+        return None, None

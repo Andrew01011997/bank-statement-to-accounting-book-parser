@@ -5,7 +5,7 @@ import unittest
 
 from parser.bank_detector import BankDetector
 from parser.parsers import MonobankParser, PrivatBankParser, NovaPayParser, GenericParser
-from tests.fakes import FakePage, FakePDF, rows
+from tests.fakes import FakePage, FakePDF, rows, words, v_edges
 
 
 MONO_HEADER = ['Дата i час операції', 'Деталі операції', 'MCC', 'Сума у валюті операції',
@@ -40,6 +40,41 @@ class MonobankParserTest(unittest.TestCase):
 
     def test_control_sum(self):
         self.assertEqual(MonobankParser().extract_control_sum(self.pdf), 5200.5)
+
+    def test_transfer_commission(self):
+        # Переказ від платіжної системи: пробіл після коми, перенос рядків у комірці
+        pdf = FakePDF(FakePage('monobank', [[
+            MONO_HEADER,
+            ['05.08.2026 07:15:01', 'Переказ коштів за 04.08.2026 згідно договору на\n'
+             'переказ № ВП-1 від 01.01.26 (сума 1234, 56 грн, комісія -\n12, 34 грн.), без ПДВ',
+             '', '1 222.22', '1 222.22', 'UAH'],
+            # Неузгоджено: 600 - 50 != 500 -> комісію не враховано, попередження
+            ['06.08.2026 08:00:00', '(сума 600,00 грн, комісія - 50,00 грн.)', '', '500.00', '500.00', 'UAH'],
+            # Комісія згадана, але формат невідомий -> попередження
+            ['07.08.2026 09:00:00', 'Переказ, комісія 5 грн', '', '95.00', '95.00', 'UAH'],
+        ]]))
+        parser = MonobankParser()
+
+        self.assertEqual(rows(parser.parse(pdf)), [
+            ('2026-08-05T07:15:01', 1234.56, 12.34, 1222.22),
+            ('2026-08-06T08:00:00', 500.0, 0.0, 500.0),
+            ('2026-08-07T09:00:00', 95.0, 0.0, 95.0),
+        ])
+        self.assertEqual(len(parser.warnings), 2)
+
+
+class TableParserTest(unittest.TestCase):
+    def test_table_closed_at_bottom_of_column_lines(self):
+        # Таблиця без нижньої межі (розрив сторінки): лінія по низу вертикальних ліній
+        page = FakePage('monobank', edges=v_edges([10, 90], 500) + v_edges([200], 816)
+                        + [{'orientation': 'h', 'x0': 10, 'top': 900, 'bottom': 900}])
+        MonobankParser().parse(FakePDF(page))
+        self.assertEqual(page.table_settings, {'explicit_horizontal_lines': [816]})
+
+    def test_no_edges_default_settings(self):
+        page = FakePage('monobank')
+        MonobankParser().parse(FakePDF(page))
+        self.assertIsNone(page.table_settings)
 
 
 class NovaPayParserTest(unittest.TestCase):
@@ -90,6 +125,46 @@ class PrivatBankParserTest(unittest.TestCase):
 
     def test_control_sum(self):
         self.assertEqual(PrivatBankParser().extract_control_sum(self.pdf), 2500.0)
+
+    def test_commission_from_description_column(self):
+        # Колонки: номер | дата | сума | призначення (249..403) | платник.
+        # У тексті сторінки колонки перемішані (ЄДРПОУ платника між "(сума" і числом),
+        # тому опис береться зі слів у межах колонки. "i" - латинська, як у PDF.
+        text = ('1 05.08.2026 990.00 Переказ коштiв ТОВ\n'
+                '07:15 (сума 12345678\n'
+                '1 000,00 грн ,\n'
+                'комiсiя - 10,00 грн.)\n'
+                '2 05.08.2026 -22 000.00 Комiсiя за обслуговування\n'
+                '10:00\n'
+                '3 06.08.2026 500.00 Переказ (сума 600,00 грн , комiсiя - 50,00 грн.)\n'
+                '4 06.08.2026 70.00 Оплата\n')
+        page_words = words(
+            (100, [(90, '1'), (135, '05.08.2026'), (185, '990.00'), (255, 'Переказ'), (300, 'коштiв'), (410, 'ТОВ')]),
+            (110, [(135, '07:15'), (255, '(сума'), (410, '12345678')]),
+            (120, [(255, '1'), (265, '000,00'), (300, 'грн'), (320, ',')]),
+            (130, [(255, 'комiсiя'), (300, '-'), (310, '10,00'), (340, 'грн.)')]),
+            (150, [(90, '2'), (135, '05.08.2026'), (185, '-22'), (200, '000.00'), (255, 'Комiсiя'), (300, 'за')]),
+            (160, [(135, '10:00')]),
+            (170, [(90, '3'), (135, '06.08.2026'), (185, '500.00'), (255, '(сума')]),
+            (178, [(255, '600,00'), (290, 'грн'), (305, ','), (310, 'комiсiя'), (350, '-'), (355, '50,00')]),
+            (186, [(255, 'грн.)')]),
+            (200, [(90, '4'), (135, '06.08.2026'), (185, '70.00'), (255, 'Оплата')]),
+            (210, [(255, '05.08.2026'), (310, '1.00')]),  # дата і число в описі - не початок рядка
+        )
+        # Лінії таблиці подвійні (дві грані поруч), як у реальному PDF
+        edges = v_edges([85, 133, 181, 248.5, 249, 402.6, 403.1, 470], 300)
+        # Блок підсумків над таблицею (1-а сторінка) зі своєю лінією всередині колонки опису
+        edges += v_edges([302], 80)
+        parser = PrivatBankParser()
+
+        result = parser.parse(FakePDF(FakePage(text, words=page_words, edges=edges)))
+
+        self.assertEqual(rows(result), [
+            ('2026-08-05T07:15:00', 1000.0, 10.0, 990.0),
+            ('2026-08-06T00:00:00', 500.0, 0.0, 500.0),  # 600 - 50 != 500
+            ('2026-08-06T00:00:00', 70.0, 0.0, 70.0),
+        ])
+        self.assertEqual(len(parser.warnings), 1)
 
 
 class GenericParserTest(unittest.TestCase):
