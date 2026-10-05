@@ -8,43 +8,17 @@ from datetime import datetime
 import re
 from ..core.base_parser import BaseParser
 from ..core.statement import Transaction
-from ..utils import constants, validators
+from ..utils import constants
 
 
-# Рядок транзакції у тексті виписки: "<номер> DD.MM.YYYY <сума> <призначення...>"
-# Дата і сума йдуть поруч; сума — число з крапкою і 2 знаками, можливо з мінусом
-# та пробілами-роздільниками тисяч (напр. "-22 000.00", "2 000.00").
-_TXN_LINE_RE = re.compile(
-    r'(\d{2}\.\d{2}\.\d{4})\s+([-−–]?\d[\d\s\xa0]*\.\d{2})(?!\d)'
-)
-# Час операції (HH:MM) — знаходиться на наступному рядку після рядка з датою.
-_TIME_RE = re.compile(r'\b(\d{2}:\d{2})\b')
+_TXN_LINE_RE = re.compile(constants.PRIVATBANK_TXN_LINE_PATTERN)
+_TIME_RE = re.compile(constants.PRIVATBANK_TIME_PATTERN)
 
 
 class PrivatBankParser(BaseParser):
-    """Парсер для виписок PrivatBank."""
+    """Парсер для виписок PrivatBank (розбір тексту сторінок, не таблиць)."""
 
-    def extract_control_sum(self, pdf) -> Optional[float]:
-        """
-        Витягує контрольну суму 'разом за кредитом' з першої сторінки.
-
-        Returns:
-            Контрольна сума або None
-        """
-        try:
-            first_page = pdf.pages[0]
-            text = first_page.extract_text()
-
-            # Шукаємо "разом за кредитом: 2 728 455.00"
-            match = re.search(r'разом за кредитом:\s*([\d\s]+\.?\d*)', text, re.IGNORECASE)
-
-            if match:
-                amount_str = match.group(1).replace(' ', '').replace('\xa0', '')
-                return float(amount_str)
-        except Exception:
-            pass
-
-        return None
+    CONTROL_SUM_PATTERN = constants.PRIVATBANK_CONTROL_SUM_PATTERN
 
     def parse(self, pdf) -> List[Transaction]:
         """
@@ -72,23 +46,16 @@ class PrivatBankParser(BaseParser):
                 if not match:
                     continue
 
-                date_str = match.group(1)
-                amount_str = match.group(2)
-
-                # PrivatBank: доходи = позитивні суми. Негативи (витрати/комісії)
-                # відсіюються validators.extract_and_validate_amount().
-                amount = validators.extract_and_validate_amount(amount_str)
+                # Доходи = позитивні суми; негативи (витрати/комісії) відсіюються
+                amount = self._extract_amount(match.group(2))
                 if amount is None:
                     continue
 
-                # Час операції — перший HH:MM на наступному рядку.
-                time_str = None
-                if i + 1 < len(lines):
-                    time_match = _TIME_RE.search(lines[i + 1])
-                    if time_match:
-                        time_str = time_match.group(1)
+                next_line = lines[i + 1] if i + 1 < len(lines) else ''
+                time_match = _TIME_RE.search(next_line)
+                time_str = time_match.group(1) if time_match else None
 
-                date_obj = self._build_datetime(date_str, time_str)
+                date_obj = self._build_datetime(match.group(1), time_str)
                 if not date_obj:
                     continue
 
