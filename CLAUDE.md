@@ -41,7 +41,7 @@ Cross-cutting rules:
 - NovaPay: comma decimals, dates without seconds tried first, control sum on the **last** page.
 - All regexes, keywords and limits live in `parser/utils/constants.py`.
 
-Adding a bank: keywords + control-sum regex in `constants.py`; subclass `TableParser` (or `BaseParser` for non-table formats); add a `BANKS` entry; export from `parser/parsers/__init__.py`; add a test in `tests/test_parsers.py`. Record changes in `.claude/CHANGELOG.md`; detailed technical docs live in `.claude/DOCS.md`.
+Adding a bank: keywords + control-sum regex in `constants.py`; subclass `TableParser` (or `BaseParser` for non-table formats); add a `BANKS` entry; export from `parser/parsers/__init__.py`; add a test in `tests/test_parsers.py`. Record changes in `.claude/CHANGELOG.md`; detailed technical docs live in `.claude/DOCS.md`; known bugs, prioritised P1–P3 with repro steps, are in `.claude/BUGS.md` (update it when fixing one).
 
 ## Memory Bank System
 
