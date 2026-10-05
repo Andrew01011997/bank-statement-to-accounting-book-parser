@@ -25,12 +25,12 @@ class PDFReader:
         Raises:
             Exception: Якщо помилка при відкритті файлу
         """
-        pdf = None
         try:
             pdf = pdfplumber.open(pdf_path)
-            yield pdf
         except Exception as e:
-            raise Exception(f"Помилка відкриття PDF файлу {pdf_path}: {e}")
+            raise Exception(f"Помилка відкриття PDF файлу {pdf_path}: {e}") from e
+
+        try:
+            yield pdf
         finally:
-            if pdf:
-                pdf.close()
+            pdf.close()

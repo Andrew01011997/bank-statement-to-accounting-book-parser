@@ -9,65 +9,63 @@ from datetime import datetime
 import re
 
 from .statement import Transaction
-from ..utils import constants, validators
+from ..utils import dates, validators
 
 
 class BaseParser(ABC):
-    """Абстрактний базовий клас для всіх парсерів банків."""
+    """
+    Абстрактний базовий клас для всіх парсерів банків.
 
-    def __init__(self):
-        # Збереження індексів колонок між сторінками
-        self.saved_date_col: Optional[int] = None
-        self.saved_amount_col: Optional[int] = None
+    Підкласи налаштовують поведінку через атрибути класу:
+        CONTROL_SUM_PATTERN: regex контрольної суми (група 1 - сума), None - без перевірки
+        CONTROL_SUM_PAGE: індекс сторінки з контрольною сумою (0 - перша, -1 - остання)
+        DECIMAL_COMMA: True якщо у виписці кома - десятковий розділювач
+        DATE_FORMATS: формати дат для _extract_date (див. utils/dates.py)
+    """
+
+    CONTROL_SUM_PATTERN: Optional[str] = None
+    CONTROL_SUM_PAGE: int = 0
+    DECIMAL_COMMA: bool = False
+    DATE_FORMATS = dates.DEFAULT_FORMATS
 
     @abstractmethod
     def parse(self, pdf) -> List[Transaction]:
         """Основний метод парсингу (реалізується в підкласах)."""
         pass
 
-    def _extract_date(self, date_str: str) -> Optional[datetime]:
+    def extract_control_sum(self, pdf) -> Optional[float]:
         """
-        Витягує дату та час з рядка.
+        Витягує контрольну суму (обіг за кредитом) з тексту сторінки CONTROL_SUM_PAGE.
 
-        Args:
-            date_str: Рядок з датою (може містити час)
+        Returns:
+            Контрольна сума або None
+        """
+        if not self.CONTROL_SUM_PATTERN:
+            return None
+
+        try:
+            text = pdf.pages[self.CONTROL_SUM_PAGE].extract_text()
+            match = re.search(self.CONTROL_SUM_PATTERN, text, re.IGNORECASE)
+
+            if match:
+                return validators.to_float(match.group(1), self.DECIMAL_COMMA)
+        except Exception:
+            pass
+
+        return None
+
+    def _extract_date(self, date_str) -> Optional[datetime]:
+        """
+        Витягує дату та час з рядка у форматах DATE_FORMATS.
 
         Returns:
             datetime об'єкт або None якщо дату не знайдено
         """
-        if not date_str:
-            return None
+        return dates.extract_datetime(date_str, self.DATE_FORMATS)
 
-        date_str_cleaned = str(date_str).strip()
-
-        # Спочатку пробуємо витягти і дату, і час
-        datetime_match = re.search(constants.DATETIME_PATTERN, date_str_cleaned)
-        if datetime_match:
-            try:
-                date_part = datetime_match.group(1)
-                time_part = datetime_match.group(2)
-                datetime_str = f"{date_part} {time_part}"
-                return datetime.strptime(datetime_str, '%d.%m.%Y %H:%M:%S')
-            except ValueError:
-                pass
-
-        # Якщо не вдалося витягти час, витягуємо тільки дату
-        date_match = re.search(constants.DATE_PATTERN, date_str_cleaned)
-        if date_match:
-            try:
-                return datetime.strptime(date_match.group(1), '%d.%m.%Y')
-            except ValueError:
-                pass
-
-        return None
-
-    def _extract_amount(self, amount_str: str) -> Optional[float]:
+    def _extract_amount(self, amount_str) -> Optional[float]:
         """
-        Витягує та валідує суму.
-        Використовує validators.extract_and_validate_amount() для фільтрації негативів.
-
-        Args:
-            amount_str: Рядок з сумою
+        Витягує та валідує суму (негативні суми відфільтровуються).
 
         Returns:
             float якщо валідна позитивна сума, інакше None
@@ -75,47 +73,4 @@ class BaseParser(ABC):
         if not amount_str:
             return None
 
-        return validators.extract_and_validate_amount(str(amount_str))
-
-    def _find_column_indices(self, row, keywords: dict) -> dict:
-        """
-        Знаходить індекси колонок за ключовими словами.
-
-        Args:
-            row: Рядок таблиці
-            keywords: {'date': ['дата', 'час'], 'amount': ['сума', 'операц']}
-
-        Returns:
-            {'date': index, 'amount': index}
-        """
-        indices = {}
-
-        for col_type, keyword_list in keywords.items():
-            for j, cell in enumerate(row):
-                if not cell:
-                    continue
-
-                cell_lower = str(cell).lower()
-
-                # Перевіряємо чи всі ключові слова присутні
-                # Для amount віддаємо перевагу колонці без "валют" (щоб уникнути "Сума у валюті рахунку")
-                if all(keyword in cell_lower for keyword in keyword_list):
-                    if col_type == 'amount' and 'валют' in cell_lower:
-                        # Пропускаємо колонку "Сума у валюті рахунку", якщо є інша
-                        if 'amount' not in indices:
-                            indices[col_type] = j
-                    else:
-                        indices[col_type] = j
-                        break  # Беремо першу знайдену (якщо це не "валют")
-
-        return indices
-
-    def extract_control_sum(self, pdf) -> Optional[float]:
-        """
-        Витягує контрольну суму з першої сторінки PDF.
-        Має бути перевизначений в підкласах для конкретних банків.
-
-        Returns:
-            Контрольна сума або None
-        """
-        return None
+        return validators.extract_and_validate_amount(str(amount_str), self.DECIMAL_COMMA)

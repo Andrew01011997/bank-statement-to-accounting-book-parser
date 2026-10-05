@@ -35,3 +35,6 @@ output/*.csv
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Claude memory bank (local-only, see CLAUDE.md)
+.claude/memory_bank/

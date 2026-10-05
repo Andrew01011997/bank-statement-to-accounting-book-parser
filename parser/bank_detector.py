@@ -12,61 +12,64 @@ from .parsers.generic_parser import GenericParser
 from .utils import constants
 
 
+UNKNOWN_BANK = 'unknown'
+
+# Реєстр банків: (тип, ключові слова на першій сторінці, клас парсера).
+# Порядок має значення - перевіряється по черзі, перший збіг перемагає.
+BANKS = (
+    ('monobank', constants.MONOBANK_KEYWORDS, MonobankParser),
+    ('privatbank', constants.PRIVATBANK_KEYWORDS, PrivatBankParser),
+    ('novapay', constants.NOVAPAY_KEYWORDS, NovaPayParser),
+)
+
+
 class BankDetector:
     """Визначення типу банку та створення відповідного парсера (Factory Pattern)."""
 
     @staticmethod
+    def detect_from_pdf(pdf) -> str:
+        """
+        Визначає тип банку за текстом першої сторінки відкритого PDF.
+
+        Returns:
+            'monobank' | 'privatbank' | 'novapay' | 'unknown'
+        """
+        try:
+            first_page_text = pdf.pages[0].extract_text()
+        except Exception:
+            return UNKNOWN_BANK
+
+        if first_page_text:
+            text_lower = first_page_text.lower()
+
+            for bank_type, keywords, _ in BANKS:
+                if any(keyword in text_lower for keyword in keywords):
+                    return bank_type
+
+        return UNKNOWN_BANK
+
+    @staticmethod
     def detect(pdf_path: str) -> str:
         """
-        Визначає тип банку за вмістом PDF.
-
-        Args:
-            pdf_path: Шлях до PDF файлу
+        Визначає тип банку за вмістом PDF файлу.
 
         Returns:
             'monobank' | 'privatbank' | 'novapay' | 'unknown'
         """
         try:
             with pdfplumber.open(pdf_path) as pdf:
-                first_page_text = pdf.pages[0].extract_text()
-
-                if first_page_text:
-                    text_lower = first_page_text.lower()
-
-                    # Перевіряємо Monobank
-                    if any(keyword in text_lower for keyword in constants.MONOBANK_KEYWORDS):
-                        return 'monobank'
-
-                    # Перевіряємо PrivatBank
-                    if any(keyword in text_lower for keyword in constants.PRIVATBANK_KEYWORDS):
-                        return 'privatbank'
-
-                    # Перевіряємо NovaPay
-                    if any(keyword in text_lower for keyword in constants.NOVAPAY_KEYWORDS):
-                        return 'novapay'
-
+                return BankDetector.detect_from_pdf(pdf)
         except Exception:
-            pass
-
-        return 'unknown'
+            return UNKNOWN_BANK
 
     @staticmethod
     def get_parser(bank_type: str) -> BaseParser:
         """
-        Повертає відповідний парсер на основі типу банку (Factory Method).
-
-        Args:
-            bank_type: 'monobank' | 'privatbank' | 'novapay' | 'unknown'
-
-        Returns:
-            Екземпляр відповідного парсера
+        Повертає новий екземпляр парсера для типу банку (Factory Method).
+        Невідомий тип -> GenericParser.
         """
-        parsers = {
-            'monobank': MonobankParser,
-            'privatbank': PrivatBankParser,
-            'novapay': NovaPayParser,
-            'unknown': GenericParser
-        }
+        for registered_type, _, parser_class in BANKS:
+            if registered_type == bank_type:
+                return parser_class()
 
-        parser_class = parsers.get(bank_type, GenericParser)
-        return parser_class()
+        return GenericParser()
