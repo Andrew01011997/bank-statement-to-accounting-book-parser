@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Валідація та фільтрація сум для парсера банківських виписок
-ВИРІШУЄ ПРОБЛЕМУ #1: Фільтрація негативних значень
+Розбір, валідація та фільтрація сум для парсера банківських виписок.
+Негативні суми (витрати) відсіюються тут — парсери пропускають None.
 """
 
 from typing import Optional
@@ -17,7 +17,7 @@ def is_negative_amount(amount_str: str) -> bool:
     - "-1200.50" (hyphen-minus)
     - "−500" (minus sign, U+2212)
     - "–300" (en dash, U+2013)
-    - "(1200)" (бухгалтерський формат - бонус)
+    - "(1200)" (бухгалтерський формат)
 
     Args:
         amount_str: Рядок з сумою для перевірки
@@ -31,7 +31,7 @@ def is_negative_amount(amount_str: str) -> bool:
     if any(cleaned.startswith(sign) for sign in constants.MINUS_SIGNS):
         return True
 
-    # Бонус: дужки (бухгалтерський формат)
+    # Дужки (бухгалтерський формат)
     if cleaned.startswith('(') and cleaned.endswith(')'):
         return True
 
@@ -51,18 +51,19 @@ def is_valid_amount(amount: float) -> bool:
     return constants.MIN_AMOUNT <= amount <= constants.MAX_AMOUNT
 
 
-def extract_and_validate_amount(amount_str: str) -> Optional[float]:
+def extract_and_validate_amount(amount_str: str, decimal_comma: bool = False) -> Optional[float]:
     """
     Комбінована функція: витягує та валідує суму.
 
     Алгоритм:
     1. Перевіряє на негативність (за знаком у рядку)
-    2. Очищує whitespace
+    2. Очищує whitespace (і замінює кому на крапку, якщо decimal_comma)
     3. Витягує число
     4. Валідує межі
 
     Args:
         amount_str: Рядок з сумою
+        decimal_comma: True якщо кома - десятковий розділювач ("1 234,56")
 
     Returns:
         float якщо валідна позитивна сума, інакше None
@@ -71,8 +72,10 @@ def extract_and_validate_amount(amount_str: str) -> Optional[float]:
         return None
 
     cleaned = re.sub(constants.WHITESPACE_PATTERN, '', amount_str)
-    match = re.search(constants.AMOUNT_PATTERN, cleaned)
+    if decimal_comma:
+        cleaned = cleaned.replace(',', '.')
 
+    match = re.search(constants.AMOUNT_PATTERN, cleaned)
     if not match:
         return None
 
@@ -81,3 +84,24 @@ def extract_and_validate_amount(amount_str: str) -> Optional[float]:
         return amount if is_valid_amount(amount) else None
     except ValueError:
         return None
+
+
+def to_float(number_str: str, decimal_comma: bool = False) -> float:
+    """
+    Перетворює суму з тексту виписки (контрольна сума, деталі операції) на float.
+    Прибирає пробіли-роздільники тисяч (звичайні та нерозривні). Знак не перевіряється.
+
+    Args:
+        number_str: Рядок з числом ("12 345.67" або "12 345,67")
+        decimal_comma: True якщо кома - десятковий розділювач
+
+    Returns:
+        float
+
+    Raises:
+        ValueError: Якщо рядок не є числом
+    """
+    cleaned = number_str.replace(' ', '').replace('\xa0', '')
+    if decimal_comma:
+        cleaned = cleaned.replace(',', '.')
+    return float(cleaned)
