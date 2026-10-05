@@ -113,8 +113,9 @@ bank-statement-to-accounting-book-parser/
 2. Визначає банк через `BankDetector.detect_from_pdf(pdf)`
 3. Отримує новий парсер через `BankDetector.get_parser()`
 4. `parser.parse(pdf)` та `parser.extract_control_sum(pdf)`
-5. Порівнює контрольну суму з сумою `gross_amount` (допуск `CONTROL_SUM_TOLERANCE` = 0.01) — лише попередження, CSV записується в будь-якому разі
-6. Записує CSV через `CSVWriter.write()`
+5. Виводить попередження парсера (`parser.warnings`, напр. неузгоджена комісія)
+6. Порівнює контрольну суму із сумою `net_amount` — зарахованого (допуск `CONTROL_SUM_TOLERANCE` = 0.01) — лише попередження, CSV записується в будь-якому разі
+7. Записує CSV через `CSVWriter.write()`
 
 Помилка в одному файлі виводиться з traceback, обробка решти продовжується.
 
@@ -194,11 +195,11 @@ bank-statement-to-accounting-book-parser/
 
 **Клас:** `PrivatBankParser(BaseParser)`
 
-- Розбирає **текст** сторінок, а не таблиці: `pdfplumber.extract_tables()` втрачав останній рядок таблиці на кожній сторінці
+- Розбирає **текст** сторінок, а не таблиці: `pdfplumber.extract_tables()` губив рядки на розривах сторінок (рядок над рамкою таблиці)
 - Рядок транзакції: `<номер> DD.MM.YYYY <сума> <призначення>` (`PRIVATBANK_TXN_LINE_PATTERN`)
 - Час `HH:MM` — з наступного рядка (`PRIVATBANK_TIME_PATTERN`)
 - Контрольна сума: `разом за кредитом: XXX` (перша сторінка)
-- Комісії немає
+- **Комісія платіжної системи:** «Призначення платежу» збирається зі слів `extract_words()` між вертикальними лініями таблиці праворуч від суми (`_page_descriptions`; у тексті сторінки колонки перемішані). Рядок транзакції починається словом-датою, за яким іде сума (`_row_anchors`). Далі `_make_transaction` (див. нижче)
 
 ---
 
@@ -209,7 +210,7 @@ bank-statement-to-accounting-book-parser/
 - Заголовок: рядок з `дата`, `сума`, `операц`
 - Колонки: `дата`+`час`, `сума`+`операц` (уникає "Сума у валюті …"), `деталі`
 - Контрольна сума: `Обіг за кредитом за період: XXX UAH` (перша сторінка)
-- **Комісія еквайрингу:** з "Деталі операції" (`Загалом X грн. Комісія банку Y грн.`) — тоді `gross = X`, `commission = Y`, `net` = сума з таблиці
+- **Комісія:** з "Деталі операції" — еквайринг (`Загалом X грн. Комісія банку Y грн.`) або переказ від платіжної системи (`(сума X грн, комісія - Y грн.)`). Тоді `gross = X`, `commission = Y`, `net` = сума з таблиці, якщо `X − Y == net` (`BaseParser._make_transaction`)
 
 ---
 
@@ -263,6 +264,7 @@ bank-statement-to-accounting-book-parser/
 | `DATE_PATTERN`, `DATETIME_PATTERN`, `DATETIME_PATTERN_SHORT` | Regex дат (з секундами / без) |
 | `AMOUNT_PATTERN`, `WHITESPACE_PATTERN` | Regex суми та пробілів (з nbsp) |
 | `GROSS_AMOUNT_PATTERN`, `COMMISSION_PATTERN` | Еквайринг Monobank |
+| `TRANSFER_COMMISSION_PATTERN` | Переказ від платіжної системи `(сума X грн, комісія - Y грн)` (PrivatBank, Monobank) |
 | `*_CONTROL_SUM_PATTERN` | Контрольні суми банків |
 | `PRIVATBANK_TXN_LINE_PATTERN`, `PRIVATBANK_TIME_PATTERN` | Текстовий розбір PrivatBank |
 | `MIN_AMOUNT` / `MAX_AMOUNT` | Межі валідних сум |
@@ -324,7 +326,7 @@ input/statement.pdf
 └─────────┬─────────┘
           ▼
 ┌───────────────────┐
-│ Контрольна сума   │ ← Σ gross vs виписка, попередження при розбіжності
+│ Контрольна сума   │ ← Σ net vs виписка, попередження при розбіжності
 └─────────┬─────────┘
           ▼
 ┌───────────────────┐

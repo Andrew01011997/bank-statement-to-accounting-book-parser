@@ -70,6 +70,9 @@ class StatementParserManager:
                 transactions = parser.parse(pdf)
                 control_sum = parser.extract_control_sum(pdf)
 
+            for warning in parser.warnings:
+                print(f"  ⚠️  {warning}")
+
             if control_sum and transactions:
                 self._report_control_sum(transactions, control_sum)
 
@@ -81,14 +84,18 @@ class StatementParserManager:
 
     @staticmethod
     def _report_control_sum(transactions: List[Transaction], control_sum: float) -> None:
-        """Порівнює контрольну суму з випискою (по gross_amount - сума до комісії) та звітує."""
-        actual_sum = sum(t.gross_amount for t in transactions)
+        """
+        Порівнює контрольну суму з випискою та звітує.
+
+        Обіг за кредитом - це зараховані суми, тобто net_amount (після комісії).
+        """
+        actual_sum = sum(t.net_amount for t in transactions)
         difference = abs(control_sum - actual_sum)
 
         if difference > constants.CONTROL_SUM_TOLERANCE:
             print(f"  ⚠️  ПОПЕРЕДЖЕННЯ: Сума транзакцій не співпадає з контрольною сумою!")
             print(f"      Контрольна сума з виписки: {control_sum:.2f} UAH")
-            print(f"      Сума розпарсених транзакцій (gross): {actual_sum:.2f} UAH")
+            print(f"      Сума розпарсених транзакцій (зараховано): {actual_sum:.2f} UAH")
             print(f"      Різниця: {difference:.2f} UAH")
             print(f"      Можливо, деякі транзакції не були розпізнані через формат PDF.")
         else:
@@ -97,9 +104,9 @@ class StatementParserManager:
         # Додатково виводимо інформацію про комісії
         total_commission = sum(t.commission for t in transactions)
         if total_commission > 0:
-            net_sum = sum(t.net_amount for t in transactions)
+            gross_sum = sum(t.gross_amount for t in transactions)
             print(f"  ℹ️  Загальна комісія: {total_commission:.2f} UAH")
-            print(f"  ℹ️  Сума після комісії (net): {net_sum:.2f} UAH")
+            print(f"  ℹ️  Дохід до комісії (gross, у Книгу): {gross_sum:.2f} UAH")
 
     def _write_csv(self, pdf_file: Path, transactions: Optional[List[Transaction]]) -> None:
         """Записує CSV з тією ж назвою, що й PDF."""
