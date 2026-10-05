@@ -9,16 +9,14 @@ from ..core.statement import Transaction
 
 
 class GenericParser(BaseParser):
-    """Загальний парсер для невідомих форматів банків (fallback)."""
+    """Загальний парсер для невідомих форматів банків (fallback, без контрольної суми)."""
 
     def parse(self, pdf) -> List[Transaction]:
-        """Універсальний парсинг."""
+        """Універсальний парсинг: перша дата і перша сума в кожному рядку таблиці."""
         transactions = []
 
         for page in pdf.pages:
-            tables = page.extract_tables()
-
-            for table in tables:
+            for table in page.extract_tables():
                 if not table:
                     continue
 
@@ -26,23 +24,17 @@ class GenericParser(BaseParser):
                     if not row or len(row) < 2:
                         continue
 
-                    # Шукаємо дату та суму в будь-якій комірці
                     date_obj = None
                     amount = None
 
                     for cell in row:
                         if not cell:
                             continue
-
-                        # Пробуємо витягти дату
                         if not date_obj:
                             date_obj = self._extract_date(cell)
-
-                        # Пробуємо витягти суму
                         if not amount:
                             amount = self._extract_amount(cell)  # Фільтрує негативні!
 
-                    # Додаємо транзакцію, якщо знайшли обидва поля
                     # Generic парсер не підтримує комісію - gross = net
                     if date_obj and amount:
                         transactions.append(Transaction(
