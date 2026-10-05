@@ -28,6 +28,7 @@ class TableParser(BaseParser):
     REQUIRED_COLUMNS = ('date', 'amount')
 
     def __init__(self):
+        super().__init__()
         self._saved_columns: Dict[str, int] = {}
 
     def parse(self, pdf) -> List[Transaction]:
@@ -35,11 +36,25 @@ class TableParser(BaseParser):
         transactions = []
 
         for page in pdf.pages:
-            for table in page.extract_tables():
+            for table in self._extract_tables(page):
                 if table:
                     transactions.extend(self._parse_table(table))
 
         return transactions
+
+    @staticmethod
+    def _extract_tables(page):
+        """
+        extract_tables() із замиканням таблиці знизу.
+
+        Якщо таблицю розірвано розривом сторінки, під останнім рядком немає
+        горизонтальної лінії, і pdfplumber цей рядок губить. Додаємо лінію по
+        низу вертикальних ліній колонок; де нижня межа є, лінія з нею збігається.
+        """
+        bottoms = [e['bottom'] for e in getattr(page, 'edges', None) or [] if e.get('orientation') == 'v']
+        if not bottoms:
+            return page.extract_tables()
+        return page.extract_tables({'explicit_horizontal_lines': [max(bottoms)]})
 
     def _parse_table(self, table) -> List[Transaction]:
         """Парсинг однієї таблиці."""

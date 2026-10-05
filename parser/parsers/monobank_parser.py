@@ -3,11 +3,10 @@
 Парсер для виписок Monobank
 """
 
-from typing import Dict, Optional, Tuple
-import re
+from typing import Dict, Optional
 from ..core.table_parser import TableParser
 from ..core.statement import Transaction
-from ..utils import constants, validators
+from ..utils import constants
 
 
 class MonobankParser(TableParser):
@@ -45,48 +44,5 @@ class MonobankParser(TableParser):
         if not net_amount:
             return None
 
-        gross_from_details, commission = self._extract_commission_from_details(cells.get('details'))
-
-        if gross_from_details and commission:
-            # Еквайринг з комісією
-            gross_amount = gross_from_details
-        else:
-            # Звичайний переказ без комісії
-            gross_amount = net_amount
-            commission = 0.0
-
-        return Transaction(
-            date=date_obj,
-            gross_amount=gross_amount,
-            commission=commission,
-            net_amount=net_amount
-        )
-
-    def _extract_commission_from_details(self, details: Optional[str]) -> Tuple[Optional[float], Optional[float]]:
-        """
-        Витягує суму та комісію з колонки "Деталі операції".
-
-        Формат: "Еквайринг, MQ000001, Загалом 1000.00 грн. Комісія банку 13.00 грн."
-
-        Returns:
-            Tuple (gross_amount, commission); None для того, що не знайдено
-        """
-        if not details:
-            return None, None
-
-        return (
-            self._search_amount(constants.GROSS_AMOUNT_PATTERN, details),
-            self._search_amount(constants.COMMISSION_PATTERN, details),
-        )
-
-    @staticmethod
-    def _search_amount(pattern: str, text: str) -> Optional[float]:
-        """Шукає суму за regex (група 1) у тексті."""
-        match = re.search(pattern, text, re.IGNORECASE)
-        if not match:
-            return None
-
-        try:
-            return validators.to_float(match.group(1))
-        except ValueError:
-            return None
+        # Комісія - з "Деталі операції" (еквайринг або переказ від платіжної системи)
+        return self._make_transaction(date_obj, net_amount, cells.get('details'))
