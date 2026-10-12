@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Тести утиліт: суми, дати, форматування CSV."""
+"""Utility tests: amounts, dates, CSV formatting."""
 
 import unittest
 from datetime import datetime

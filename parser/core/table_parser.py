@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Базовий клас для парсерів, що читають таблиці PDF з рядком заголовка (Template Method)
+Base class for parsers that read PDF tables with a header row (Template Method).
 """
 
 from abc import abstractmethod
@@ -12,19 +12,19 @@ from .statement import Transaction
 
 class TableParser(BaseParser):
     """
-    Парсинг таблиць pdfplumber з визначенням колонок за заголовком.
+    Parses pdfplumber tables, detecting columns from the header row.
 
-    Індекси колонок зберігаються між таблицями та сторінками, бо на наступних
-    сторінках заголовок зазвичай відсутній. Тому екземпляр парсера
-    використовується лише для одного файлу.
+    Column indices are kept across tables and pages, because later pages
+    usually have no header. A parser instance is therefore used for one
+    file only.
 
-    Підкласи реалізують:
-        _is_header(row_text) - чи є рядок заголовком таблиці
-        _detect_columns(row, columns) - індекси колонок із заголовка
-        _build_transaction(cells) - транзакція з комірок рядка (або None)
+    Subclasses implement:
+        _is_header(row_text) - whether the row is a table header
+        _detect_columns(row, columns) - column indices from the header
+        _build_transaction(cells) - a transaction from the row cells (or None)
     """
 
-    # Колонки, без яких таблицю неможливо розібрати
+    # Columns without which a table cannot be parsed
     REQUIRED_COLUMNS = ('date', 'amount')
 
     def __init__(self):
@@ -32,7 +32,7 @@ class TableParser(BaseParser):
         self._saved_columns: Dict[str, int] = {}
 
     def parse(self, pdf) -> List[Transaction]:
-        """Парсинг усіх таблиць на всіх сторінках."""
+        """Parses all tables on all pages."""
         transactions = []
 
         for page in pdf.pages:
@@ -45,11 +45,11 @@ class TableParser(BaseParser):
     @staticmethod
     def _extract_tables(page):
         """
-        extract_tables() із замиканням таблиці знизу.
+        extract_tables() with the table closed at the bottom.
 
-        Якщо таблицю розірвано розривом сторінки, під останнім рядком немає
-        горизонтальної лінії, і pdfplumber цей рядок губить. Додаємо лінію по
-        низу вертикальних ліній колонок; де нижня межа є, лінія з нею збігається.
+        When a table is split by a page break, there is no horizontal line under
+        its last row and pdfplumber drops that row. We add a line at the bottom of
+        the vertical column lines; where a bottom border exists, it coincides with it.
         """
         bottoms = [e['bottom'] for e in getattr(page, 'edges', None) or [] if e.get('orientation') == 'v']
         if not bottoms:
@@ -57,11 +57,11 @@ class TableParser(BaseParser):
         return page.extract_tables({'explicit_horizontal_lines': [max(bottoms)]})
 
     def _parse_table(self, table) -> List[Transaction]:
-        """Парсинг однієї таблиці."""
+        """Parses a single table."""
         columns: Dict[str, Optional[int]] = dict(self._saved_columns)
         header_row_idx = None
 
-        # Шукаємо заголовок
+        # Find the header
         for i, row in enumerate(table):
             if not row:
                 continue
@@ -81,7 +81,7 @@ class TableParser(BaseParser):
         if any(columns.get(name) is None for name in self.REQUIRED_COLUMNS):
             return []
 
-        # Парсимо дані
+        # Parse the data rows
         start_row = header_row_idx + 1 if header_row_idx is not None else 0
         transactions = []
 
@@ -106,40 +106,40 @@ class TableParser(BaseParser):
 
     @abstractmethod
     def _is_header(self, row_text: str) -> bool:
-        """Чи є рядок (текст комірок у нижньому регістрі) заголовком таблиці."""
+        """Whether the row (lower-cased cell text) is a table header."""
 
     @abstractmethod
     def _detect_columns(self, row, columns: Dict[str, Optional[int]]) -> Dict[str, Optional[int]]:
         """
-        Визначає індекси колонок за рядком заголовка.
+        Detects column indices from the header row.
 
         Args:
-            row: Рядок заголовка
-            columns: Поточні (збережені) індекси колонок
+            row: Header row
+            columns: Current (saved) column indices
 
         Returns:
-            Індекси колонок для цієї таблиці
+            Column indices for this table
         """
 
     @abstractmethod
     def _build_transaction(self, cells: Dict[str, Optional[str]]) -> Optional[Transaction]:
         """
-        Створює транзакцію з комірок рядка.
+        Builds a transaction from the row cells.
 
         Args:
-            cells: {назва колонки: значення комірки або None}
+            cells: {column name: cell value or None}
 
         Returns:
-            Transaction або None якщо рядок не є доходом/транзакцією
+            Transaction, or None if the row is not an income transaction
         """
 
     @staticmethod
     def _find_column_indices(row, keywords: dict) -> dict:
         """
-        Знаходить індекси колонок за ключовими словами.
+        Finds column indices by keywords.
 
         Args:
-            row: Рядок таблиці
+            row: Table row
             keywords: {'date': ['дата', 'час'], 'amount': ['сума', 'операц']}
 
         Returns:
@@ -154,15 +154,15 @@ class TableParser(BaseParser):
 
                 cell_lower = str(cell).lower()
 
-                # Перевіряємо чи всі ключові слова присутні
-                # Для amount віддаємо перевагу колонці без "валют" (щоб уникнути "Сума у валюті рахунку")
+                # All keywords must be present.
+                # For amount, prefer a column without "валют" (avoids "Сума у валюті рахунку")
                 if all(keyword in cell_lower for keyword in keyword_list):
                     if col_type == 'amount' and 'валют' in cell_lower:
-                        # Пропускаємо колонку "Сума у валюті рахунку", якщо є інша
+                        # Use the "account currency" column only if nothing better is found
                         if 'amount' not in indices:
                             indices[col_type] = j
                     else:
                         indices[col_type] = j
-                        break  # Беремо першу знайдену (якщо це не "валют")
+                        break  # Take the first match (unless it is a "валют" column)
 
         return indices

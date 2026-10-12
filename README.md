@@ -1,153 +1,135 @@
 # Bank Statement to Accounting Book Parser
 
-Парсер банківських виписок PDF для автоматичної генерації Книги обліку доходів ФОП.
+[![CI](https://github.com/Andrew01011997/bank-statement-to-accounting-book-parser/actions/workflows/ci.yml/badge.svg)](https://github.com/Andrew01011997/bank-statement-to-accounting-book-parser/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)
 
-## Можливості
+🇺🇦 [Українська версія](README.uk.md)
 
-- Автоматичне визначення типу банку/платіжного сервісу
-- Підтримка **ПриватБанку**, **Монобанку** та **NovaPay**
-- Фільтрація витрат (парсить тільки доходи)
-- Валідація контрольних сум з виписок
-- Генерація CSV для імпорту в Excel
+Turns Ukrainian bank statement PDFs into CSV files for the income ledger of a sole proprietor (FOP, "Книга обліку доходів"). Income is extracted, expenses are dropped, and every statement is checked against the bank's own credit total.
 
-## Підтримувані банки та сервіси
+## Features
 
-| Банк/Сервіс | Статус | Контрольна сума |
-|-------------|--------|-----------------|
-| ПриватБанк | ✅ | "Разом за кредитом" |
-| Монобанк | ✅ | "Обіг за кредитом за період" |
+- **Automatic bank detection** from the PDF content
+- **PrivatBank, Monobank, NovaPay** support, with a best-effort generic fallback
+- **Income only**: debits, fees and refunds are filtered out
+- **Commission handling**: acquiring and payment-system fees are split into gross amount, commission and credited amount
+- **Control-sum verification** against the statement's credit turnover
+- **Excel-ready CSV** (UTF-8 with BOM, comma decimals)
+- **Fully offline**: statements never leave your machine
+
+## Supported banks
+
+| Bank / service | Status | Control sum line |
+|----------------|--------|------------------|
+| PrivatBank | ✅ | "Разом за кредитом" |
+| Monobank | ✅ | "Обіг за кредитом за період" |
 | NovaPay | ✅ | "Обороти по кредиту" |
-| Інші | ⚠️ Generic парсер |
+| Other | ⚠️ Generic parser, no verification ([known issue #3](docs/KNOWN_ISSUES.md#3-generic-parser-takes-the-amount-from-a-date-time-or-row-number)) | — |
 
-## Встановлення
+## Quick start
 
-### Вимоги
-- Python 3.7+
+Requires **Python 3.10+**.
 
-### Windows
+1. Download or clone the repository.
+2. Put your PDF statements into the `input/` folder.
+3. Run:
+   - **Windows:** double-click `run.bat`
+   - **macOS / Linux:** `./run.sh`
+4. Collect the CSV files from `output/`.
 
-```bash
-pip install -r requirements.txt
-```
+The launchers install the only dependency (`pdfplumber`) on first run.
 
-### macOS / Linux
-
-```bash
-pip3 install -r requirements.txt
-```
-
-## Використання
-
-### 1. Простий спосіб (рекомендовано)
-
-1. Покладіть PDF виписки у папку `input/`
-2. Запустіть:
-
-**Windows:** подвійний клік на `run.bat`
-
-**macOS/Linux:**
-```bash
-./run.sh
-```
-
-3. Результат у папці `output/`
-
-### 2. Через Python
+### Manual run
 
 ```bash
-python3 main.py
+python -m pip install -r requirements.txt
+python main.py
 ```
 
-## Структура проекту
+Each `input/<name>.pdf` produces `output/<name>.csv`.
 
-```
-bank-statement-to-accounting-book-parser/
-├── main.py                 # Точка входу
-├── run.sh / run.bat        # Скрипти запуску
-├── requirements.txt        # Залежності (pdfplumber)
-│
-├── input/                  # ← Сюди кладіть PDF виписки
-├── output/                 # ← Тут з'являться CSV файли
-│
-├── parser/                 # Модуль парсера
-│   ├── manager.py          # Координатор процесу
-│   ├── bank_detector.py    # Визначення банку (Factory)
-│   │
-│   ├── core/               # Базові класи
-│   │   ├── base_parser.py  # Абстрактний парсер
-│   │   ├── table_parser.py # Шаблон для табличних парсерів
-│   │   └── statement.py    # Модель Transaction
-│   │
-│   ├── parsers/            # Парсери для банків
-│   │   ├── privatbank_parser.py
-│   │   ├── monobank_parser.py
-│   │   ├── novapay_parser.py
-│   │   └── generic_parser.py
-│   │
-│   ├── io/                 # Робота з файлами
-│   │   ├── pdf_reader.py   # Читання PDF
-│   │   └── csv_writer.py   # Запис CSV
-│   │
-│   └── utils/              # Утиліти
-│       ├── constants.py    # Константи, regex
-│       ├── validators.py   # Валідація сум
-│       ├── dates.py        # Розбір дат
-│       └── formatters.py   # Форматування
-│
-└── .claude/                # Документація
-    ├── CHANGELOG.md        # Журнал змін
-    └── DOCS.md             # Технічна документація
-```
-
-## Формат вихідного CSV
+## Output
 
 | Час | Дата | Сума | Комісія | Сума з врахуванням комісії |
 |-----|------|------|---------|----------------------------|
 | 12:30:45 | 15.01.2024 | 1000,00 | 13,00 | 987,00 |
 
-- **Комісія:** лише для еквайрингу Монобанку, для інших — 0
+Column headers are in Ukrainian because they are the ledger's columns: time, date, amount (gross), commission, amount net of commission.
 
-- **Кодування:** UTF-8 з BOM (для Excel)
-- **Формат суми:** Європейський (кома як розділювач)
-- **Порядок:** зворотний до порядку у виписці (виписки йдуть від нових до старих, тож CSV — хронологічний)
+- **Commission** is filled for Monobank acquiring and for payment-system transfers ("сума X грн, комісія Y грн") at PrivatBank and Monobank; otherwise it is `0`
+- **Encoding:** UTF-8 with BOM, so Excel opens it correctly
+- **Amounts:** comma as the decimal separator
+- **Order:** chronological (statements list newest first; the CSV is reversed)
 
-## Як це працює
+## Verifying the result
+
+For known banks the console shows whether the parsed total matches the statement:
 
 ```
-PDF виписка
-    │
-    ▼
-BankDetector → визначає банк/сервіс за ключовими словами
-    │
-    ▼
-Parser (Monobank/PrivatBank/NovaPay/Generic) → витягує транзакції
-    │
-    ▼
-Validator → фільтрує витрати, залишає тільки доходи
-    │
-    ▼
-CSVWriter → генерує CSV файл
+Processing: statement.pdf
+  Bank: Privatbank
+  ✓ Control sum matches: 12345.67 UAH
+CSV written: output/statement.csv
+  ✓ 42 transaction(s) found
 ```
 
-## Примітки
+A `⚠️ WARNING: transaction total does not match the control sum!` means some rows were missed or misread. The CSV is still written so you can fix it by hand. Please [open an issue](https://github.com/Andrew01011997/bank-statement-to-accounting-book-parser/issues/new/choose) with an anonymised description of the layout.
 
-- Парсер обробляє **тільки доходи** (позитивні суми)
-- Назва CSV файлу = назва PDF файлу
-- При невідповідності контрольної суми виводиться попередження
-- Підтримуються різні Unicode символи мінуса (hyphen, minus sign, en dash)
+## How it works
 
-## Розробка
+```
+PDF statement
+    │
+    ▼
+BankDetector   → detects the bank from first-page keywords
+    │
+    ▼
+Parser         → extracts income transactions (Monobank / PrivatBank / NovaPay / Generic)
+    │
+    ▼
+Control sum    → compares the parsed total with the statement's credit turnover
+    │
+    ▼
+CSVWriter      → writes the ledger CSV
+```
 
-Тести (без реальних виписок):
+Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Privacy
+
+Bank statements contain personal financial data. This tool:
+
+- runs locally and makes no network requests;
+- git-ignores everything inside `input/` and `output/`;
+- is tested only with synthetic data.
+
+Never commit statements or CSV output, and never attach them to issues. See [SECURITY.md](SECURITY.md).
+
+## Disclaimer
+
+This software is provided as is. It is not tax or accounting advice. Always review the generated ledger before submitting anything to the tax authority.
+
+## Development
 
 ```bash
-python -m unittest discover -s tests -t .
+python -m pip install -r requirements-dev.txt
+python -m unittest discover -s tests -t .   # tests
+ruff check .                                # lint
 ```
 
-Детальна технічна документація: [.claude/DOCS.md](.claude/DOCS.md)
+- [Contributing guide](CONTRIBUTING.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Known issues](docs/KNOWN_ISSUES.md)
+- [Changelog](CHANGELOG.md)
 
-Журнал змін: [.claude/CHANGELOG.md](.claude/CHANGELOG.md)
+## Roadmap
 
-## Ліцензія
+- More banks (PUMB, Oschadbank, …)
+- Command-line options for the input/output folders
+- Merging several statements into one CSV
+- Excel (.xlsx) export
 
-MIT
+## License
+
+[MIT](LICENSE)

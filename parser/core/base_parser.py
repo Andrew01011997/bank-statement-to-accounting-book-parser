@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Базовий абстрактний клас для всіх парсерів банків
+Abstract base class for all bank parsers.
 """
 
 from abc import ABC, abstractmethod
@@ -14,13 +14,13 @@ from ..utils import constants, dates, validators
 
 class BaseParser(ABC):
     """
-    Абстрактний базовий клас для всіх парсерів банків.
+    Abstract base class for all bank parsers.
 
-    Підкласи налаштовують поведінку через атрибути класу:
-        CONTROL_SUM_PATTERN: regex контрольної суми (група 1 - сума), None - без перевірки
-        CONTROL_SUM_PAGE: індекс сторінки з контрольною сумою (0 - перша, -1 - остання)
-        DECIMAL_COMMA: True якщо у виписці кома - десятковий розділювач
-        DATE_FORMATS: формати дат для _extract_date (див. utils/dates.py)
+    Subclasses configure behaviour through class attributes:
+        CONTROL_SUM_PATTERN: control-sum regex (group 1 = amount); None disables the check
+        CONTROL_SUM_PAGE: index of the page with the control sum (0 = first, -1 = last)
+        DECIMAL_COMMA: True if the statement uses a comma as the decimal separator
+        DATE_FORMATS: date formats for _extract_date (see utils/dates.py)
     """
 
     CONTROL_SUM_PATTERN: Optional[str] = None
@@ -29,20 +29,20 @@ class BaseParser(ABC):
     DATE_FORMATS = dates.DEFAULT_FORMATS
 
     def __init__(self):
-        # Попередження розбору (напр. неузгоджена комісія); виводить менеджер
+        # Parsing warnings (e.g. inconsistent commission); printed by the manager
         self.warnings: List[str] = []
 
     @abstractmethod
     def parse(self, pdf) -> List[Transaction]:
-        """Основний метод парсингу (реалізується в підкласах)."""
+        """Parses the statement (implemented by subclasses)."""
         pass
 
     def extract_control_sum(self, pdf) -> Optional[float]:
         """
-        Витягує контрольну суму (обіг за кредитом) з тексту сторінки CONTROL_SUM_PAGE.
+        Extracts the control sum (credit turnover) from the text of CONTROL_SUM_PAGE.
 
         Returns:
-            Контрольна сума або None
+            Control sum or None
         """
         if not self.CONTROL_SUM_PATTERN:
             return None
@@ -60,19 +60,19 @@ class BaseParser(ABC):
 
     def _extract_date(self, date_str) -> Optional[datetime]:
         """
-        Витягує дату та час з рядка у форматах DATE_FORMATS.
+        Extracts a date (and time) using DATE_FORMATS.
 
         Returns:
-            datetime об'єкт або None якщо дату не знайдено
+            datetime or None if no date was found
         """
         return dates.extract_datetime(date_str, self.DATE_FORMATS)
 
     def _extract_amount(self, amount_str) -> Optional[float]:
         """
-        Витягує та валідує суму (негативні суми відфільтровуються).
+        Extracts and validates an amount (negative amounts are filtered out).
 
         Returns:
-            float якщо валідна позитивна сума, інакше None
+            float for a valid positive amount, otherwise None
         """
         if not amount_str:
             return None
@@ -82,27 +82,27 @@ class BaseParser(ABC):
     def _make_transaction(self, date: datetime, net_amount: float,
                           details: Optional[str] = None) -> Transaction:
         """
-        Транзакція з урахуванням комісії з призначення платежу.
+        Builds a transaction, taking the commission from the payment description.
 
-        net_amount - сума, що надійшла на рахунок (колонка суми виписки).
-        Якщо в details знайдено суму до комісії та комісію, і вони узгоджені
-        (gross - commission == net), то gross = сума до комісії. Інакше gross = net,
-        а при неузгодженості додається попередження.
+        net_amount is what was credited to the account (the statement's amount column).
+        If details contain a pre-commission amount and a commission that are consistent
+        (gross - commission == net), gross is the pre-commission amount. Otherwise
+        gross = net, and a warning is added when they are inconsistent.
         """
         gross, commission = self._extract_commission(details)
 
         if gross is None:
             if details and re.search(r'ком[iі]с[iі]я', str(details), re.IGNORECASE):
                 self.warnings.append(
-                    f"{date.strftime('%d.%m.%Y %H:%M')}: в описі є комісія, але формат не розпізнано; "
-                    f"записано зараховану суму {net_amount:.2f}"
+                    f"{date.strftime('%d.%m.%Y %H:%M')}: description mentions a commission in an "
+                    f"unrecognised format; recorded the credited amount {net_amount:.2f}"
                 )
             return Transaction(date=date, gross_amount=net_amount, net_amount=net_amount)
 
         if abs(gross - commission - net_amount) > constants.CONTROL_SUM_TOLERANCE:
             self.warnings.append(
-                f"{date.strftime('%d.%m.%Y %H:%M')}: сума {gross:.2f} - комісія {commission:.2f} "
-                f"!= зараховано {net_amount:.2f}; комісію не враховано"
+                f"{date.strftime('%d.%m.%Y %H:%M')}: amount {gross:.2f} - commission {commission:.2f} "
+                f"!= credited {net_amount:.2f}; commission ignored"
             )
             return Transaction(date=date, gross_amount=net_amount, net_amount=net_amount)
 
@@ -111,14 +111,14 @@ class BaseParser(ABC):
     @staticmethod
     def _extract_commission(details: Optional[str]) -> Tuple[Optional[float], Optional[float]]:
         """
-        Сума до комісії та комісія з призначення платежу.
+        Pre-commission amount and commission from the payment description.
 
-        Формати:
-            "(сума 1 234,56 грн , комiсiя - 9,99 грн.)" - переказ від платіжної системи
-            "Загалом 1000.00 грн. Комісія банку 13.00 грн." - еквайринг Monobank
+        Formats:
+            "(сума 1 234,56 грн , комiсiя - 12,34 грн.)" - payment-system transfer
+            "Загалом 1000.00 грн. Комісія банку 13.00 грн." - Monobank acquiring
 
         Returns:
-            (gross, commission) або (None, None), якщо комісії немає
+            (gross, commission) or (None, None) if there is no commission
         """
         if not details:
             return None, None

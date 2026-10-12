@@ -1,27 +1,28 @@
 @echo off
-REM Скрипт запуску парсера для Windows
+REM Launcher for Windows: installs dependencies if needed and runs the parser.
 
-echo === Парсер банківських виписок ===
+REM Run from the script folder so input\ and output\ resolve correctly
+cd /d "%~dp0"
+
+echo === Bank statement parser ===
 echo.
 
-REM Перевірка наявності Python
 python --version >nul 2>&1
 if errorlevel 1 (
-    echo Помилка: Python не встановлено!
-    echo Завантажте Python з https://www.python.org/downloads/
+    echo Error: Python is not installed.
+    echo Download Python 3.10+ from https://www.python.org/downloads/
     pause
     exit /b 1
 )
 
-REM Перевірка наявності залежностей
+REM Install into the same interpreter that runs main.py
 python -c "import pdfplumber" >nul 2>&1
 if errorlevel 1 (
-    echo Встановлення залежностей...
-    pip install -r requirements.txt
+    echo Installing dependencies...
+    python -m pip install -r requirements.txt
     echo.
 )
 
-REM Запуск парсера
 python main.py
 
 echo.

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Підробні PDF-об'єкти з інтерфейсом pdfplumber (pages, extract_text, extract_tables, extract_words, edges)."""
+"""Fake PDF objects mimicking the pdfplumber interface (pages, extract_text, extract_tables, extract_words, edges)."""
 
 
 class FakePage:
@@ -8,7 +8,7 @@ class FakePage:
         self._tables = tables or []
         self._words = words or []
         self.edges = edges or []
-        self.table_settings = None  # останні налаштування, передані в extract_tables
+        self.table_settings = None  # last settings passed to extract_tables
 
     def extract_text(self):
         return self._text
@@ -27,19 +27,19 @@ class FakePDF:
 
 
 def rows(transactions):
-    """Транзакції -> список (дата ISO, gross, commission, net) для порівняння."""
+    """Transactions -> list of (ISO date, gross, commission, net) for comparison."""
     return [(t.date.isoformat(), t.gross_amount, t.commission, t.net_amount) for t in transactions]
 
 
 def words(*lines):
     """
-    Слова pdfplumber з рядків (top, [(x0, текст), ...]).
-    Ширина слова - 5 pt на символ.
+    pdfplumber words from lines (top, [(x0, text), ...]).
+    Word width is 5 pt per character.
     """
     return [{'text': text, 'x0': x0, 'x1': x0 + 5 * len(text), 'top': top}
             for top, items in lines for x0, text in items]
 
 
 def v_edges(xs, bottom):
-    """Вертикальні лінії таблиці на позиціях xs до висоти bottom."""
+    """Vertical table lines at positions xs down to bottom."""
     return [{'orientation': 'v', 'x0': x, 'top': 50, 'bottom': bottom} for x in xs]

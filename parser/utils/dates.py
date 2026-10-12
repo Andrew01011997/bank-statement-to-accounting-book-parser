@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Розбір дат та часу з комірок банківських виписок
+Date and time parsing for statement cells.
 """
 
 from datetime import datetime
@@ -9,25 +9,25 @@ import re
 from . import constants
 
 
-# (regex, формат strptime). Групи regex з'єднуються пробілом перед strptime.
+# (regex, strptime format). Regex groups are joined with a space before strptime.
 DATETIME_FULL = (constants.DATETIME_PATTERN, '%d.%m.%Y %H:%M:%S')
 DATETIME_SHORT = (constants.DATETIME_PATTERN_SHORT, '%d.%m.%Y %H:%M')
 DATE_ONLY = (constants.DATE_PATTERN, '%d.%m.%Y')
 
-# Порядок має значення: перший формат, що підійшов, перемагає
+# Order matters: the first matching format wins
 DEFAULT_FORMATS = (DATETIME_FULL, DATE_ONLY)
 
 
 def extract_datetime(value, formats: Sequence[Tuple[str, str]] = DEFAULT_FORMATS) -> Optional[datetime]:
     """
-    Витягує дату (та час, якщо є) з рядка, пробуючи формати по черзі.
+    Extracts a date (and time, if present) from a string, trying formats in order.
 
     Args:
-        value: Рядок або комірка таблиці з датою
-        formats: Послідовність (regex, формат strptime)
+        value: String or table cell containing a date
+        formats: Sequence of (regex, strptime format)
 
     Returns:
-        datetime об'єкт або None якщо дату не знайдено
+        datetime or None if no date was found
     """
     if not value:
         return None

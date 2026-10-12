@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Обгортка для роботи з PDF файлами
+PDF file wrapper.
 """
 
 from contextlib import contextmanager
@@ -8,27 +8,27 @@ import pdfplumber
 
 
 class PDFReader:
-    """Обгортка для роботи з PDF файлами."""
+    """PDF file wrapper."""
 
     @staticmethod
     @contextmanager
     def open(pdf_path: str):
         """
-        Безпечне відкриття PDF файлу з контекстним менеджером.
+        Opens a PDF file as a context manager.
 
         Args:
-            pdf_path: Шлях до PDF файлу
+            pdf_path: Path to the PDF file
 
         Yields:
-            PDF об'єкт
+            pdfplumber PDF object
 
         Raises:
-            Exception: Якщо помилка при відкритті файлу
+            Exception: If the file cannot be opened
         """
         try:
             pdf = pdfplumber.open(pdf_path)
         except Exception as e:
-            raise Exception(f"Помилка відкриття PDF файлу {pdf_path}: {e}") from e
+            raise Exception(f"Cannot open PDF file {pdf_path}: {e}") from e
 
         try:
             yield pdf

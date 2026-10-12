@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Загальний парсер для невідомих форматів банків (fallback)
+Generic parser for unknown statement formats (fallback).
 """
 
 from typing import List
@@ -9,10 +9,10 @@ from ..core.statement import Transaction
 
 
 class GenericParser(BaseParser):
-    """Загальний парсер для невідомих форматів банків (fallback, без контрольної суми)."""
+    """Generic parser for unknown statement formats (fallback, no control sum)."""
 
     def parse(self, pdf) -> List[Transaction]:
-        """Універсальний парсинг: перша дата і перша сума в кожному рядку таблиці."""
+        """Best-effort parsing: the first date and the first amount in every table row."""
         transactions = []
 
         for page in pdf.pages:
@@ -33,9 +33,9 @@ class GenericParser(BaseParser):
                         if not date_obj:
                             date_obj = self._extract_date(cell)
                         if not amount:
-                            amount = self._extract_amount(cell)  # Фільтрує негативні!
+                            amount = self._extract_amount(cell)  # Filters out negatives!
 
-                    # Generic парсер не підтримує комісію - gross = net
+                    # The generic parser does not support commissions: gross = net
                     if date_obj and amount:
                         transactions.append(Transaction(
                             date=date_obj,

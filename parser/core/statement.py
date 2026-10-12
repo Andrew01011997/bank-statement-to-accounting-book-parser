@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Модель даних для банківської транзакції
+Bank transaction data model.
 """
 
 from dataclasses import dataclass, field
@@ -11,27 +11,27 @@ from typing import Optional
 @dataclass
 class Transaction:
     """
-    Модель банківської транзакції.
+    A bank transaction (income only).
 
-    Поля:
-        date: Дата та час транзакції
-        gross_amount: Повна сума до вирахування комісії (Сума)
-        commission: Комісія банку (0 якщо немає)
-        net_amount: Сума після вирахування комісії (Сума з врахуванням комісії)
+    Fields:
+        date: Transaction date and time
+        gross_amount: Amount before commission (CSV "Сума")
+        commission: Bank / payment-system commission (0 if none)
+        net_amount: Amount after commission (CSV "Сума з врахуванням комісії")
     """
     date: datetime
-    gross_amount: float  # Сума (до комісії)
-    commission: float = 0.0  # Комісія
-    net_amount: Optional[float] = field(default=None)  # Сума з врахуванням комісії
+    gross_amount: float  # Amount before commission
+    commission: float = 0.0  # Commission
+    net_amount: Optional[float] = field(default=None)  # Amount after commission
 
     def __post_init__(self):
-        """Обчислює net_amount якщо не вказано."""
+        """Computes net_amount when it is not given."""
         if self.net_amount is None:
             self.net_amount = self.gross_amount - self.commission
 
     @property
     def amount(self) -> float:
-        """Зворотна сумісність - повертає gross_amount."""
+        """Backward compatibility: returns gross_amount."""
         return self.gross_amount
 
     def __repr__(self):

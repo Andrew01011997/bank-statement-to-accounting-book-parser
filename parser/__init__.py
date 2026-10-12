@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Парсер банківських виписок для створення Книги обліку доходів."""
+"""Bank statement parser that builds the FOP income ledger ("Книга обліку доходів")."""
 
 from .manager import StatementParserManager
 from .core.statement import Transaction

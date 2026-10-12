@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Модулі для роботи з файлами (PDF та CSV)."""
+"""File I/O (PDF and CSV)."""
 
 from .pdf_reader import PDFReader
 from .csv_writer import CSVWriter
