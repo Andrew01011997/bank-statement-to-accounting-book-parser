@@ -45,12 +45,14 @@ class InputFolderTest(unittest.TestCase):
         self.assertEqual([c.args[0].name for c in process_file.call_args_list], ['a.PDF', 'B.pdf', 'c.pdf'])
 
     def test_same_csv_name_is_not_overwritten(self):
+        # Both names can coexist only on a case-sensitive file system, so the listing is mocked
         self.input_dir.mkdir()
-        for name in ('statement.pdf', 'Statement.PDF'):
-            (self.input_dir / name).touch()
+        files = [self.input_dir / 'statement.pdf', self.input_dir / 'Statement.PDF']
 
         manager = self.manager()
-        with mock.patch.object(manager, 'process_file', return_value=True) as process_file:
+        with mock.patch.object(Path, 'iterdir', return_value=iter(files)), \
+                mock.patch.object(Path, 'is_file', return_value=True), \
+                mock.patch.object(manager, 'process_file', return_value=True) as process_file:
             result, out = run_quietly(manager)
 
         self.assertFalse(result)
