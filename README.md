@@ -38,7 +38,7 @@ Requires **Python 3.10+**.
    - **macOS / Linux:** `./run.sh`
 4. Collect the CSV files from `output/`.
 
-The launchers install the only dependency (`pdfplumber`) on first run.
+The launchers install the only dependency (`pdfplumber`) on first run. For unattended runs (Task Scheduler, cron) use `run.bat --no-pause` or `run.sh`: the exit code is `1` if any file failed.
 
 ### Manual run
 

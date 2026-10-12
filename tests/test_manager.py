@@ -11,62 +11,96 @@ from unittest import mock
 from parser.manager import StatementParserManager
 
 
-class FileDiscoveryTest(unittest.TestCase):
-    """docs/KNOWN_ISSUES.md #13: *.PDF found on every OS, same processing order on every OS."""
+def run_quietly(manager):
+    """Runs the manager, returning (result, stdout)."""
+    out = io.StringIO()
+    with redirect_stdout(out), redirect_stderr(io.StringIO()):
+        result = manager.run()
+    return result, out.getvalue()
+
+
+class InputFolderTest(unittest.TestCase):
+    """docs/KNOWN_ISSUES.md #13: *.PDF found on every OS, same order on every OS, no crashes."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.tmp = Path(self._tmp.name)
+        self.input_dir = self.tmp / 'input'
+        self.addCleanup(self._tmp.cleanup)
+
+    def manager(self):
+        return StatementParserManager(self.input_dir, self.tmp / 'output')
 
     def test_finds_pdfs_case_insensitively_in_name_order(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            input_dir = Path(tmp, 'input')
-            input_dir.mkdir()
-            for name in ('c.pdf', 'B.pdf', 'a.PDF', 'notes.txt'):
-                Path(input_dir, name).touch()
-            Path(input_dir, 'nested.pdf').mkdir()
+        self.input_dir.mkdir()
+        for name in ('c.pdf', 'B.pdf', 'a.PDF', 'notes.txt'):
+            (self.input_dir / name).touch()
+        (self.input_dir / 'nested.pdf').mkdir()
 
-            manager = StatementParserManager(input_dir, Path(tmp, 'output'))
-            with mock.patch.object(manager, 'process_file') as process_file, \
-                    redirect_stdout(io.StringIO()):
-                manager.run()
+        manager = self.manager()
+        with mock.patch.object(manager, 'process_file', return_value=True) as process_file:
+            result, _ = run_quietly(manager)
 
+        self.assertTrue(result)
         self.assertEqual([c.args[0].name for c in process_file.call_args_list], ['a.PDF', 'B.pdf', 'c.pdf'])
 
+    def test_same_csv_name_is_not_overwritten(self):
+        self.input_dir.mkdir()
+        for name in ('statement.pdf', 'Statement.PDF'):
+            (self.input_dir / name).touch()
+
+        manager = self.manager()
+        with mock.patch.object(manager, 'process_file', return_value=True) as process_file:
+            result, out = run_quietly(manager)
+
+        self.assertFalse(result)
+        self.assertEqual(process_file.call_count, 1)
+        self.assertIn('would overwrite', out)
+
+    def test_missing_input_folder(self):
+        result, out = run_quietly(self.manager())
+        self.assertFalse(result)
+        self.assertIn('does not exist', out)
 
     def test_input_path_is_a_file(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            Path(tmp, 'input').touch()
-            manager = StatementParserManager(Path(tmp, 'input'), Path(tmp, 'output'))
-            out = io.StringIO()
-            with redirect_stdout(out):
-                manager.run()
-
-        self.assertIn('is not a folder', out.getvalue())
-
+        self.input_dir.touch()
+        result, out = run_quietly(self.manager())
+        self.assertFalse(result)
+        self.assertIn('is not a folder', out)
 
     def test_unreadable_input_folder(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            Path(tmp, 'input').mkdir()
-            manager = StatementParserManager(Path(tmp, 'input'), Path(tmp, 'output'))
-            out = io.StringIO()
-            with mock.patch.object(Path, 'iterdir', side_effect=PermissionError('denied')), \
-                    redirect_stdout(out):
-                failures = manager.run()
+        self.input_dir.mkdir()
+        manager = self.manager()
+        with mock.patch.object(Path, 'iterdir', side_effect=PermissionError('denied')):
+            result, out = run_quietly(manager)
 
-        self.assertEqual(failures, 1)
-        self.assertIn('Cannot read folder', out.getvalue())
+        self.assertFalse(result)
+        self.assertIn('Cannot read folder', out)
+
+    def test_empty_input_folder_is_not_an_error(self):
+        self.input_dir.mkdir()
+        result, out = run_quietly(self.manager())
+        self.assertTrue(result)
+        self.assertIn('nothing to do', out)
 
 
-class FailureCountTest(unittest.TestCase):
-    def test_failed_files_are_counted(self):
+class ResultTest(unittest.TestCase):
+    def test_broken_pdfs_fail(self):
         with tempfile.TemporaryDirectory() as tmp:
             input_dir = Path(tmp, 'input')
             input_dir.mkdir()
-            for name in ('a.pdf', 'b.pdf'):
-                Path(input_dir, name).write_bytes(b'not a pdf')
+            Path(input_dir, 'a.pdf').write_bytes(b'not a pdf')
 
-            manager = StatementParserManager(input_dir, Path(tmp, 'output'))
-            with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
-                failures = manager.run()
+            result, out = run_quietly(StatementParserManager(input_dir, Path(tmp, 'output')))
 
-        self.assertEqual(failures, 2)
+        self.assertFalse(result)
+        self.assertIn('1 of 1 file(s) failed', out)
+
+    def test_no_transactions_is_a_failure(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            manager = StatementParserManager(Path(tmp, 'input'), Path(tmp, 'output'))
+            with redirect_stdout(io.StringIO()):
+                self.assertFalse(manager._write_csv(Path('a.pdf'), []))
 
 
 if __name__ == '__main__':

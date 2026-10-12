@@ -31,5 +31,28 @@ class ConsoleEncodingTest(unittest.TestCase):
         self.assertIn('❌'.encode('utf-8'), result.stdout)
 
 
+
+class ExitCodeTest(unittest.TestCase):
+    def run_main(self, cwd):
+        return subprocess.run([sys.executable, str(MAIN_PY)], cwd=cwd, capture_output=True,
+                              env=dict(os.environ, PYTHONIOENCODING='utf-8'))
+
+    def test_output_path_is_a_file(self):
+        with tempfile.TemporaryDirectory() as cwd:
+            Path(cwd, 'output').touch()
+            result = self.run_main(cwd)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertNotIn(b'Traceback', result.stderr)
+        self.assertIn('Cannot create the output folder'.encode(), result.stdout)
+
+    def test_empty_input_folder_exits_0(self):
+        with tempfile.TemporaryDirectory() as cwd:
+            Path(cwd, 'input').mkdir()
+            result = self.run_main(cwd)
+
+        self.assertEqual(result.returncode, 0, result.stdout.decode('utf-8', 'replace'))
+
+
 if __name__ == '__main__':
     unittest.main()

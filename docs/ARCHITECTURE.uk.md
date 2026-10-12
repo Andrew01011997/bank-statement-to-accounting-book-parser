@@ -107,8 +107,8 @@ bank-statement-to-accounting-book-parser/
 | Метод | Опис |
 |-------|------|
 | `__init__(input_dir, output_dir)` | Папки input/output |
-| `run()` | Парсинг усіх PDF у папці input (`.pdf` без урахування регістру, за алфавітом); повертає кількість помилок, з яких `main.py` робить код виходу 1 |
-| `process_file(pdf_file)` | Обробка одного PDF; `False`, якщо сталася помилка |
+| `run()` | Парсинг усіх PDF у папці input (`.pdf` без урахування регістру, за алфавітом; другий файл, що записав би той самий CSV, пропускається). Повертає `False`, якщо папка input непридатна або якийсь файл не оброблено; `main.py` робить з цього код виходу 1 |
+| `process_file(pdf_file)` | Обробка одного PDF; `False` при помилці або якщо транзакцій не знайдено |
 | `_report_control_sum(transactions, control_sum)` | Звіт про збіг контрольної суми та комісії |
 | `_write_csv(pdf_file, transactions)` | Запис CSV з назвою PDF |
 

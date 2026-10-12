@@ -18,7 +18,7 @@ python -m unittest tests.test_parsers.NovaPayParserTest.test_parse   # single te
 ruff check .                                  # lint (config in pyproject.toml)
 ```
 
-`run.bat` / `run.sh` wrap `main.py` and auto-install deps. No build step; CI (`.github/workflows/ci.yml`) runs ruff and the tests on Linux/Windows/macOS, Python 3.10 and 3.13. Tests use synthetic fake pages (`tests/fakes.py` mimics pdfplumber's `pages` / `extract_text()` / `extract_tables()`); real statements are still the final check — run `main.py` and look for "Control sum matches". Everything in `input/` and `output/` is gitignored — never commit statements or put real statement data into tests (personal financial data).
+`run.bat` / `run.sh` wrap `main.py` and auto-install deps. No build step; CI (`.github/workflows/ci.yml`) runs ruff once (Ubuntu, Python 3.13) and the tests on Linux/Windows/macOS with Python 3.10 and 3.13. `main.py` exits 1 if the input folder is unusable or any file fails (error, no transactions, or a CSV name clash); `run.bat --no-pause` skips the final pause. Tests use synthetic fake pages (`tests/fakes.py` mimics pdfplumber's `pages` / `extract_text()` / `extract_tables()`); real statements are still the final check — run `main.py` and look for "Control sum matches". Everything in `input/` and `output/` is gitignored — never commit statements or put real statement data into tests (personal financial data).
 
 ## Architecture
 

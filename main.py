@@ -35,8 +35,13 @@ def configure_console() -> None:
 def main() -> int:
     """Entry point. Returns the process exit code: 0 on success, 1 if anything failed."""
     configure_console()
-    manager = StatementParserManager()
-    return 1 if manager.run() else 0
+    try:
+        manager = StatementParserManager()
+    except OSError as e:
+        # The output folder cannot be created (e.g. "output" is a file)
+        print(f"❌ Cannot create the output folder: {e}")
+        return 1
+    return 0 if manager.run() else 1
 
 
 if __name__ == '__main__':
