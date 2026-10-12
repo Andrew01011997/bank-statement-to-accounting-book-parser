@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "deny": [
-      "Edit(.claude/memory_bank/archive/**)",
-      "Write(.claude/memory_bank/archive/**)"
-    ]
-  }
-}
