@@ -20,10 +20,17 @@ python -c "import pdfplumber" >nul 2>&1
 if errorlevel 1 (
     echo Installing dependencies...
     python -m pip install -r requirements.txt
+    if errorlevel 1 (
+        echo Error: failed to install dependencies.
+        pause
+        exit /b 1
+    )
     echo.
 )
 
 python main.py
+set "STATUS=%ERRORLEVEL%"
 
 echo.
 pause
+exit /b %STATUS%

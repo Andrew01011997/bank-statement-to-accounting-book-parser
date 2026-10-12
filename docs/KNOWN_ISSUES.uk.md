@@ -119,5 +119,5 @@
 - **Було:** `glob('*.pdf')` не знаходив `*.PDF` на Linux і macOS, порядок обробки не був відсортований.
 
 ### 14. ✅ ВИПРАВЛЕНО — Монобанк: не перевірялась узгодженість комісії
-- **Статус:** виправлено. `BaseParser._make_transaction` приймає комісію лише при `gross − commission == net` (допуск 0.01), інакше `gross = net` і попередження в консолі. Діє для всіх парсерів. Тести: `test_transfer_commission`, `test_commission_from_description_column`.
+- **Статус:** виправлено. `BaseParser._make_transaction` приймає комісію лише при `gross − commission == net` (допуск 0.01), інакше `gross = net` і попередження в консолі. Діє для парсерів, що читають комісію (ПриватБанк, Монобанк); NovaPay і загальний парсер створюють транзакції без комісії. Тести: `test_transfer_commission`, `test_commission_from_description_column`.
 - **Було:** `gross` брався з «Деталей операції», `net` з колонки суми, але `gross − commission == net` не перевірявся. Помилка розбору деталей непомітно змінила б суму в Книзі.

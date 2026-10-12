@@ -28,37 +28,59 @@ class StatementParserManager:
         # Create the output folder if it does not exist
         self.output_dir.mkdir(exist_ok=True)
 
-    def run(self) -> None:
-        """Parses every PDF in the input folder."""
+    def run(self) -> int:
+        """
+        Parses every PDF in the input folder.
+
+        Returns:
+            Number of failures: files that raised an error, or 1 if the input folder is unusable
+        """
         print("=== Bank statement parser ===\n")
 
-        if not self.input_dir.is_dir():
+        if not self.input_dir.exists():
             print(f"❌ Folder {self.input_dir} does not exist!")
-            return
+            return 1
 
-        # Case-insensitive extension (*.PDF on Linux/macOS) and the same order on every OS
-        pdf_files = sorted((p for p in self.input_dir.iterdir()
-                            if p.is_file() and p.suffix.lower() == '.pdf'),
-                           key=lambda p: (p.name.casefold(), p.name))
+        if not self.input_dir.is_dir():
+            print(f"❌ {self.input_dir} is not a folder!")
+            return 1
+
+        try:
+            # Case-insensitive extension (*.PDF on Linux/macOS) and the same order on every OS
+            pdf_files = sorted((p for p in self.input_dir.iterdir()
+                                if p.is_file() and p.suffix.lower() == '.pdf'),
+                               key=lambda p: (p.name.casefold(), p.name))
+        except OSError as e:
+            print(f"❌ Cannot read folder {self.input_dir}: {e}")
+            return 1
 
         if not pdf_files:
             print(f"❌ No PDF files found in {self.input_dir}")
-            return
+            return 0
 
         print(f"Found {len(pdf_files)} file(s) to process\n")
 
+        failures = 0
         for pdf_file in pdf_files:
-            self.process_file(pdf_file)
+            if not self.process_file(pdf_file):
+                failures += 1
             print()
 
-        print("✓ Done!")
+        if failures:
+            print(f"❌ Done with errors: {failures} of {len(pdf_files)} file(s) failed")
+        else:
+            print("✓ Done!")
+        return failures
 
-    def process_file(self, pdf_file: Path) -> None:
+    def process_file(self, pdf_file: Path) -> bool:
         """
         Processes one PDF: detect bank -> parse -> verify -> CSV.
 
         Args:
             pdf_file: Path to the PDF file
+
+        Returns:
+            False if processing raised an error, True otherwise
         """
         print(f"Processing: {pdf_file.name}")
 
@@ -82,6 +104,9 @@ class StatementParserManager:
         except Exception as e:
             print(f"Error while processing {pdf_file}: {e}")
             traceback.print_exc()
+            return False
+
+        return True
 
     @staticmethod
     def _report_control_sum(transactions: List[Transaction], control_sum: float) -> None:

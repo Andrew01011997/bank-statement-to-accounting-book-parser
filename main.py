@@ -32,12 +32,12 @@ def configure_console() -> None:
             pass
 
 
-def main():
-    """Entry point."""
+def main() -> int:
+    """Entry point. Returns the process exit code: 0 on success, 1 if anything failed."""
     configure_console()
     manager = StatementParserManager()
-    manager.run()
+    return 1 if manager.run() else 0
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

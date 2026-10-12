@@ -24,7 +24,9 @@ class ConsoleEncodingTest(unittest.TestCase):
                 cwd=cwd, env=env, capture_output=True,
             )
 
-        self.assertEqual(result.returncode, 0, result.stderr.decode('utf-8', 'replace'))
+        # Missing input folder is reported with exit code 1, not a crash
+        self.assertEqual(result.returncode, 1, result.stderr.decode('utf-8', 'replace'))
+        self.assertNotIn(b'Traceback', result.stderr)
         self.assertNotIn(b'UnicodeEncodeError', result.stderr)
         self.assertIn('❌'.encode('utf-8'), result.stdout)
 

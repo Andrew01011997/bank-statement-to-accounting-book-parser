@@ -107,8 +107,8 @@ bank-statement-to-accounting-book-parser/
 | Method | Description |
 |--------|-------------|
 | `__init__(input_dir, output_dir)` | Sets the input/output folders |
-| `run()` | Parses every PDF in the input folder (case-insensitive `.pdf`, sorted) |
-| `process_file(pdf_file)` | Processes one PDF |
+| `run()` | Parses every PDF in the input folder (case-insensitive `.pdf`, sorted); returns the number of failures, which `main.py` turns into exit code 1 |
+| `process_file(pdf_file)` | Processes one PDF; `False` if it raised an error |
 | `_report_control_sum(transactions, control_sum)` | Reports the control-sum match and commission totals |
 | `_write_csv(pdf_file, transactions)` | Writes a CSV named after the PDF |
 

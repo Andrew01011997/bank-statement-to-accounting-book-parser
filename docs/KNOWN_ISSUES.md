@@ -119,5 +119,5 @@ Priorities:
 - **Before:** `glob('*.pdf')` missed `*.PDF` on Linux and macOS; processing order was unsorted.
 
 ### 14. ✅ FIXED — Monobank: commission consistency was not checked
-- **Status:** fixed. `BaseParser._make_transaction` accepts a commission only when `gross − commission == net` (tolerance 0.01); otherwise `gross = net` and a console warning is printed. Applies to all parsers. Tests: `test_transfer_commission`, `test_commission_from_description_column`.
+- **Status:** fixed. `BaseParser._make_transaction` accepts a commission only when `gross − commission == net` (tolerance 0.01); otherwise `gross = net` and a console warning is printed. Applies to the parsers that read commissions (PrivatBank, Monobank); NovaPay and the generic parser build transactions without a commission. Tests: `test_transfer_commission`, `test_commission_from_description_column`.
 - **Before:** `gross` came from "Деталі операції" and `net` from the amount column, but `gross − commission == net` was not checked. A details-parsing error would silently change the ledger amount.

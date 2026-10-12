@@ -88,7 +88,8 @@ def extract_and_validate_amount(amount_str: str, decimal_comma: bool = False) ->
 def to_float(number_str: str, decimal_comma: bool = False) -> float:
     """
     Converts an amount from statement text (control sum, transaction details) to float.
-    Removes space thousands separators (regular and non-breaking). The sign is not checked.
+    Removes space thousands separators (regular, no-break U+00A0, narrow no-break U+202F).
+    The sign is not checked.
 
     Args:
         number_str: Number string ("12 345.67" or "12 345,67")
@@ -100,7 +101,7 @@ def to_float(number_str: str, decimal_comma: bool = False) -> float:
     Raises:
         ValueError: If the string is not a number
     """
-    cleaned = number_str.replace(' ', '').replace('\xa0', '')
+    cleaned = re.sub(constants.THOUSANDS_SEPARATOR_PATTERN, '', number_str)
     if decimal_comma:
         cleaned = cleaned.replace(',', '.')
     return float(cleaned)

@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Code, comments, docstrings and console messages are in English. CSV headers stay Ukrainian (they are the ledger's columns), as do keywords and regexes that match statement text
 - Documentation moved from `.claude/` to `docs/`, changelog to the repository root
 - Minimum Python version is 3.10
+- `main.py` exits with code 1 when the input folder is missing or unreadable or any file fails; the launchers pass the code on
 - Sample amounts in comments, docs and tests replaced with synthetic values
 
 ### Fixed

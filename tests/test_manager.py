@@ -4,7 +4,7 @@
 import io
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest import mock
 
@@ -38,7 +38,35 @@ class FileDiscoveryTest(unittest.TestCase):
             with redirect_stdout(out):
                 manager.run()
 
-        self.assertIn('does not exist', out.getvalue())
+        self.assertIn('is not a folder', out.getvalue())
+
+
+    def test_unreadable_input_folder(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, 'input').mkdir()
+            manager = StatementParserManager(Path(tmp, 'input'), Path(tmp, 'output'))
+            out = io.StringIO()
+            with mock.patch.object(Path, 'iterdir', side_effect=PermissionError('denied')), \
+                    redirect_stdout(out):
+                failures = manager.run()
+
+        self.assertEqual(failures, 1)
+        self.assertIn('Cannot read folder', out.getvalue())
+
+
+class FailureCountTest(unittest.TestCase):
+    def test_failed_files_are_counted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            input_dir = Path(tmp, 'input')
+            input_dir.mkdir()
+            for name in ('a.pdf', 'b.pdf'):
+                Path(input_dir, name).write_bytes(b'not a pdf')
+
+            manager = StatementParserManager(input_dir, Path(tmp, 'output'))
+            with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+                failures = manager.run()
+
+        self.assertEqual(failures, 2)
 
 
 if __name__ == '__main__':
