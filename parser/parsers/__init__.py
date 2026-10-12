@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Парсери для різних банків."""
+"""Bank-specific parsers."""
 
 from .monobank_parser import MonobankParser
 from .privatbank_parser import PrivatBankParser

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Парсер для виписок PrivatBank
+PrivatBank statement parser.
 """
 
 from collections import Counter, defaultdict
@@ -16,31 +16,31 @@ _TXN_LINE_RE = re.compile(constants.PRIVATBANK_TXN_LINE_PATTERN)
 _TIME_RE = re.compile(constants.PRIVATBANK_TIME_PATTERN)
 _DATE_WORD_RE = re.compile(r'\d{2}\.\d{2}\.\d{4}')
 
-# Допуск (pt) для слів "на одному рядку" та на межах колонки
+# Tolerance (pt) for words "on the same line" and at column boundaries
 _LINE_TOLERANCE = 2
 
 
 class PrivatBankParser(BaseParser):
-    """Парсер для виписок PrivatBank (розбір тексту сторінок, не таблиць)."""
+    """PrivatBank statements (parses page text, not tables)."""
 
     CONTROL_SUM_PATTERN = constants.PRIVATBANK_CONTROL_SUM_PATTERN
 
     def parse(self, pdf) -> List[Transaction]:
         """
-        Парсинг PrivatBank виписки з тексту сторінок.
+        Parses a PrivatBank statement from page text.
 
-        Раніше використовувалось page.extract_tables(), але pdfplumber стабільно
-        губить рядок на розриві сторінки (він опиняється поза рамкою таблиці),
-        через що контрольна сума не сходилась. Розбір за текстом захоплює всі рядки.
+        page.extract_tables() used to be used, but pdfplumber consistently drops
+        the row at a page break (it ends up outside the table frame), so the
+        control sum did not match. Parsing the text captures every row.
 
-        Кожна транзакція займає кілька текстових рядків:
-            "<номер> DD.MM.YYYY <сума> <призначення...>"   <- дата і сума
-            "<...> HH:MM <призначення-продовження...>"       <- час операції
-        Час беремо з наступного рядка після рядка з датою.
+        Each transaction spans several text lines:
+            "<no> DD.MM.YYYY <amount> <description...>"   <- date and amount
+            "<...> HH:MM <description continued...>"       <- transaction time
+        The time is taken from the line after the date line.
 
-        Комісію шукаємо в "Призначенні платежу". У тексті сторінки ця колонка
-        перемішана з сусідніми, тому опис збираємо зі слів у межах колонки
-        (див. _page_descriptions).
+        The commission is looked up in "Призначення платежу" (payment description).
+        In the page text this column is interleaved with its neighbours, so the
+        description is collected from words within the column (see _page_descriptions).
         """
         transactions = []
 
@@ -56,7 +56,7 @@ class PrivatBankParser(BaseParser):
                 if not match:
                     continue
 
-                # Доходи = позитивні суми; негативи (витрати/комісії) відсіюються
+                # Income = positive amounts; negatives (expenses/fees) are dropped
                 amount = self._extract_amount(match.group(2))
                 if amount is None:
                     continue
@@ -69,7 +69,7 @@ class PrivatBankParser(BaseParser):
                 if not date_obj:
                     continue
 
-                # Сума у виписці - зараховано (net); комісія - з призначення платежу
+                # The statement amount is what was credited (net); commission comes from the description
                 queue = descriptions.get((match.group(1), amount))
                 details = queue.pop(0) if queue else None
                 transactions.append(self._make_transaction(date_obj, amount, details))
@@ -78,14 +78,15 @@ class PrivatBankParser(BaseParser):
 
     def _page_descriptions(self, page) -> Dict[Tuple[str, float], List[str]]:
         """
-        Тексти колонки "Призначення платежу" сторінки за координатами слів.
+        Texts of the page's "Призначення платежу" column, from word coordinates.
 
-        Рядок транзакції починається словом-датою в колонці дати, за яким іде сума.
-        Колонка опису - між вертикальними лініями таблиці праворуч від суми.
-        Опис транзакції - слова колонки від її рядка до наступного (або до низу таблиці).
+        A transaction row starts with a date word in the date column followed by the amount.
+        The description column lies between the table's vertical lines right of the amount.
+        A transaction's description is the column's words from its row to the next one
+        (or to the bottom of the table).
 
         Returns:
-            {(дата, сума): [описи у порядку зверху вниз]}; {} якщо розмітку не знайдено
+            {(date, amount): [descriptions top to bottom]}; {} if the layout was not found
         """
         words = page.extract_words() if hasattr(page, 'extract_words') else []
         v_edges = [e for e in getattr(page, 'edges', None) or [] if e.get('orientation') == 'v']
@@ -96,16 +97,16 @@ class PrivatBankParser(BaseParser):
         if not anchors:
             return {}
 
-        # Лише лінії таблиці транзакцій: блок підсумків над нею (1-а сторінка) має свої лінії
+        # Transaction-table lines only: the totals block above it (page 1) has its own lines
         v_edges = [e for e in v_edges if e['bottom'] > anchors[0][0]]
         if not v_edges:
             return {}
 
-        # Колонка опису: від першої вертикальної лінії праворуч від суми до наступної
+        # Description column: from the first vertical line right of the amount to the next one
         amount_right = max(right for _, _, _, right in anchors)
         xs = []
         for x in sorted(e['x0'] for e in v_edges):
-            # Лінія таблиці має товщину: дві грані поруч (248.5 і 249.0) - одна межа
+            # Table lines have thickness: two edges side by side (248.5 and 249.0) are one boundary
             if not xs or x - xs[-1] > _LINE_TOLERANCE:
                 xs.append(x)
         right_of_amount = [x for x in xs if x >= amount_right - _LINE_TOLERANCE]
@@ -127,7 +128,7 @@ class PrivatBankParser(BaseParser):
 
     @staticmethod
     def _join_lines(row_words) -> str:
-        """Слова -> текст: групуємо в рядки за top (з допуском), у рядку - зліва направо."""
+        """Words -> text: group into lines by top (with tolerance), left to right within a line."""
         lines: List[List[dict]] = []
         for w in sorted(row_words, key=lambda w: w['top']):
             if lines and abs(w['top'] - lines[-1][0]['top']) < _LINE_TOLERANCE:
@@ -138,11 +139,11 @@ class PrivatBankParser(BaseParser):
 
     def _row_anchors(self, words) -> List[Tuple[float, str, Optional[float], float]]:
         """
-        Початки рядків транзакцій: (top, дата, сума або None для витрат, права межа суми), зверху вниз.
+        Transaction row starts: (top, date, amount or None for expenses, amount right edge), top to bottom.
 
-        Береться слово-дата, за яким на тому ж рядку стоїть сума (як у
-        PRIVATBANK_TXN_LINE_PATTERN). Дати з опису відкидаються: якорі мають бути
-        в одній колонці (найчастіший x0).
+        Takes a date word followed by an amount on the same line (as in
+        PRIVATBANK_TXN_LINE_PATTERN). Dates inside descriptions are discarded: anchors
+        must share one column (the most common x0).
         """
         candidates = []
         for w in words:
@@ -155,10 +156,10 @@ class PrivatBankParser(BaseParser):
             match = _TXN_LINE_RE.match(line_text)
             if not match:
                 continue
-            # Слова, з яких складається сума (з роздільниками тисяч)
+            # Words that make up the amount (with thousands separators)
             amount_words = len(match.group(0).split()) - 1
             amount_right = line[amount_words]['x1']
-            # Від'ємні рядки лишаються якорями (межа попереднього опису), але без суми
+            # Negative rows stay anchors (they bound the previous description) but carry no amount
             amount = self._extract_amount(match.group(2))
             candidates.append((w['top'], round(w['x0']), match.group(1), amount, amount_right))
 
@@ -172,7 +173,7 @@ class PrivatBankParser(BaseParser):
 
     @staticmethod
     def _build_datetime(date_str: str, time_str: Optional[str]) -> Optional[datetime]:
-        """Будує datetime з дати (DD.MM.YYYY) та часу (HH:MM, опційно)."""
+        """Builds a datetime from a date (DD.MM.YYYY) and an optional time (HH:MM)."""
         try:
             if time_str:
                 return datetime.strptime(f"{date_str} {time_str}", '%d.%m.%Y %H:%M')

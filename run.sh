@@ -1,26 +1,41 @@
-#!/bin/bash
-# Скрипт запуску парсера для macOS/Linux
+#!/usr/bin/env bash
+# Launcher for macOS/Linux: installs dependencies if needed and runs the parser.
+set -uo pipefail
 
-echo "=== Парсер банківських виписок ==="
+# Pause before exit only in an interactive terminal (not in cron/CI/pipes)
+pause() {
+    if [ -t 0 ]; then
+        echo ""
+        read -r -p "Press Enter to exit..." || true
+    fi
+}
+
+# Run from the script's folder so input/ and output/ resolve correctly
+cd "$(dirname "$0")" || exit 1
+
+echo "=== Bank statement parser ==="
 echo ""
 
-# Перевірка наявності Python
 if ! command -v python3 &> /dev/null; then
-    echo "Помилка: Python 3 не встановлено!"
-    echo "Встановіть Python 3 перед використанням."
+    echo "Error: Python 3 is not installed."
+    echo "Install Python 3.10+ and try again."
+    pause
     exit 1
 fi
 
-# Перевірка наявності залежностей
+# Install into the same interpreter that runs main.py
 if ! python3 -c "import pdfplumber" &> /dev/null; then
-    echo "Встановлення залежностей..."
-    pip3 install -r requirements.txt
+    echo "Installing dependencies..."
+    if ! python3 -m pip install -r requirements.txt; then
+        echo "Error: failed to install dependencies."
+        pause
+        exit 1
+    fi
     echo ""
 fi
 
-# Запуск парсера
 python3 main.py
+status=$?
 
-echo ""
-echo "Натисніть Enter для виходу..."
-read
+pause
+exit "$status"

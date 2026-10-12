@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Форматування дат та сум для парсера банківських виписок
+Date and amount formatting for the ledger CSV.
 """
 
 from datetime import datetime
@@ -10,33 +10,34 @@ if TYPE_CHECKING:
     from ..core.statement import Transaction
 
 
-# Заголовки CSV колонок
+# CSV column headers. Kept in Ukrainian: they are the income ledger's column names
+# (time, date, amount, commission, amount net of commission).
 CSV_HEADERS = ['Час', 'Дата', 'Сума', 'Комісія', 'Сума з врахуванням комісії']
 
 
 def format_date(date: datetime, fmt: str = '%d.%m.%Y') -> str:
     """
-    Форматує дату.
+    Formats a date.
 
     Args:
-        date: Об'єкт datetime
-        fmt: Формат дати (за замовчуванням '%d.%m.%Y')
+        date: datetime object
+        fmt: Date format (default '%d.%m.%Y')
 
     Returns:
-        Відформатована дата як рядок
+        Formatted date string
     """
     return date.strftime(fmt)
 
 
 def format_amount(amount: float) -> str:
     """
-    Форматує суму в європейському форматі (кома як розділювач).
+    Formats an amount with a comma as the decimal separator.
 
     Args:
-        amount: Сума для форматування
+        amount: Amount to format
 
     Returns:
-        Відформатована сума (наприклад: 123.45 -> "123,45")
+        Formatted amount (e.g. 123.45 -> "123,45")
 
     Examples:
         >>> format_amount(123.45)
@@ -44,51 +45,43 @@ def format_amount(amount: float) -> str:
         >>> format_amount(1234.56)
         '1234,56'
     """
-    float_string = f"{amount:.2f}"
-    # Замінюємо крапку на кому
-    return float_string.replace('.', ',')
+    return f"{amount:.2f}".replace('.', ',')
 
 
 def format_time(date: datetime) -> str:
     """
-    Форматує час.
+    Formats a time.
 
     Args:
-        date: Об'єкт datetime
+        date: datetime object
 
     Returns:
-        Відформатований час як рядок (HH:MM:SS)
+        Formatted time string (HH:MM:SS)
     """
     return date.strftime('%H:%M:%S')
 
 
 def format_csv_row(transaction: 'Transaction') -> list:
     """
-    Генерує рядок CSV з транзакції.
+    Builds a CSV row from a transaction.
 
-    Структура (5 колонок):
-    1. Час
-    2. Дата
-    3. Сума (gross_amount - до комісії)
-    4. Комісія
-    5. Сума з врахуванням комісії (net_amount - після комісії)
+    Layout (5 columns):
+    1. Час - time
+    2. Дата - date
+    3. Сума - gross_amount (before commission)
+    4. Комісія - commission
+    5. Сума з врахуванням комісії - net_amount (after commission)
 
     Args:
-        transaction: Транзакція
+        transaction: Transaction
 
     Returns:
-        Список з 5 елементами для CSV рядка
+        List of 5 values for the CSV row
     """
-    time_str = format_time(transaction.date)
-    date_str = format_date(transaction.date)
-    gross_str = format_amount(transaction.gross_amount)
-    commission_str = format_amount(transaction.commission)
-    net_str = format_amount(transaction.net_amount)
-
     return [
-        time_str,        # Час
-        date_str,        # Дата
-        gross_str,       # Сума
-        commission_str,  # Комісія
-        net_str          # Сума з врахуванням комісії
+        format_time(transaction.date),
+        format_date(transaction.date),
+        format_amount(transaction.gross_amount),
+        format_amount(transaction.commission),
+        format_amount(transaction.net_amount),
     ]

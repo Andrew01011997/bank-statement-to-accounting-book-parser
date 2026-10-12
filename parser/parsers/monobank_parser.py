@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Парсер для виписок Monobank
+Monobank statement parser.
 """
 
 from typing import Dict, Optional
@@ -10,7 +10,7 @@ from ..utils import constants
 
 
 class MonobankParser(TableParser):
-    """Парсер для виписок Monobank (таблиці; комісія еквайрингу з "Деталі операції")."""
+    """Monobank statements (tables; acquiring commission from "Деталі операції")."""
 
     CONTROL_SUM_PATTERN = constants.MONOBANK_CONTROL_SUM_PATTERN
 
@@ -25,7 +25,7 @@ class MonobankParser(TableParser):
 
     def _detect_columns(self, row, columns: Dict[str, Optional[int]]) -> Dict[str, Optional[int]]:
         indices = self._find_column_indices(row, self.COLUMN_KEYWORDS)
-        # Заголовок повністю визначає колонки цієї таблиці (відсутні -> None)
+        # The header fully defines this table's columns (missing ones -> None)
         return {name: indices.get(name) for name in self.COLUMN_KEYWORDS}
 
     def _build_transaction(self, cells: Dict[str, Optional[str]]) -> Optional[Transaction]:
@@ -39,10 +39,10 @@ class MonobankParser(TableParser):
         if not date_obj:
             return None
 
-        # Колонка "Сума операції" - сума, що надійшла (після комісії)
+        # "Сума операції" is the credited amount (after commission)
         net_amount = self._extract_amount(amount_cell)
         if not net_amount:
             return None
 
-        # Комісія - з "Деталі операції" (еквайринг або переказ від платіжної системи)
+        # Commission comes from "Деталі операції" (acquiring or payment-system transfer)
         return self._make_transaction(date_obj, net_amount, cells.get('details'))

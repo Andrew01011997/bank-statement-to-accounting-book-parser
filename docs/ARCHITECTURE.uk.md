@@ -1,35 +1,36 @@
-# Документація проекту Bank Statement to Accounting Book Parser
+# Архітектура
 
-Парсер банківських виписок PDF для автоматичної генерації Книги обліку доходів.
+🇬🇧 [English version](ARCHITECTURE.md)
 
----
+Технічна документація парсера банківських виписок для Книги обліку доходів ФОП.
 
 ## Зміст
 
-1. [Огляд архітектури](#огляд-архітектури)
-2. [Структура файлів](#структура-файлів)
-3. [Детальний опис модулів](#детальний-опис-модулів)
+1. [Огляд](#огляд)
+2. [Структура проекту](#структура-проекту)
+3. [Модулі](#модулі)
 4. [Потік даних](#потік-даних)
-5. [Як додати новий банк](#як-додати-новий-банк)
-6. [Тести](#тести)
+5. [Архітектурні рішення](#архітектурні-рішення)
+6. [Як додати банк](#як-додати-банк)
+7. [Тести](#тести)
 
 ---
 
-## Огляд архітектури
+## Огляд
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                         main.py                              │
-│                    (точка входу)                             │
+│                          main.py                            │
+│                       (точка входу)                         │
 └─────────────────────────┬───────────────────────────────────┘
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                  StatementParserManager                      │
-│                     (manager.py)                             │
-│                                                              │
-│  • Знаходить PDF у input/, відкриває кожен один раз          │
-│  • BankDetector → Parser → перевірка контрольної суми → CSV  │
+│                  StatementParserManager                     │
+│                      (manager.py)                           │
+│                                                             │
+│  • Знаходить PDF у input/, відкриває кожен один раз         │
+│  • BankDetector → Parser → перевірка контрольної суми → CSV │
 └─────────────────────────┬───────────────────────────────────┘
                           │
           ┌───────────────┼───────────────┐
@@ -43,30 +44,33 @@
        │
        ▼ (створює)
 ┌─────────────────────────────────────────────────────────────┐
-│ BaseParser (ABC) — контрольна сума, дати, суми               │
-│  ├── TableParser (ABC) — таблиці з заголовком                │
-│  │    ├── MonobankParser                                     │
-│  │    └── NovaPayParser                                      │
-│  ├── PrivatBankParser — розбір тексту сторінок               │
-│  └── GenericParser — fallback                                │
+│ BaseParser (ABC) — контрольна сума, дати, суми, комісія     │
+│  ├── TableParser (ABC) — таблиці з заголовком               │
+│  │    ├── MonobankParser                                    │
+│  │    └── NovaPayParser                                     │
+│  ├── PrivatBankParser — розбір тексту сторінок              │
+│  └── GenericParser — fallback                               │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Структура файлів
+## Структура проекту
 
 ```
 bank-statement-to-accounting-book-parser/
 ├── main.py                 # Точка входу
-├── run.sh / run.bat        # Скрипти запуску
-├── requirements.txt        # Залежності (pdfplumber)
-├── input/                  # Вхідні PDF файли
-├── output/                 # Вихідні CSV файли
+├── run.sh / run.bat        # Скрипти запуску (встановлюють залежності, запускають main.py)
+├── requirements.txt        # Залежність (pdfplumber)
+├── requirements-dev.txt    # + ruff
+├── pyproject.toml          # Налаштування інструментів (ruff)
+├── input/                  # Вхідні PDF (ігноруються git)
+├── output/                 # Вихідні CSV (ігноруються git)
+├── docs/                   # Архітектура, відомі проблеми
 ├── tests/                  # Юніт-тести (unittest, синтетичні сторінки)
 │
-└── parser/                 # Головний модуль
-    ├── __init__.py         # Експорт публічного API
+└── parser/                 # Головний пакет
+    ├── __init__.py         # Публічний API
     ├── manager.py          # Координатор процесу
     ├── bank_detector.py    # Реєстр банків + Factory для парсерів
     │
@@ -94,7 +98,7 @@ bank-statement-to-accounting-book-parser/
 
 ---
 
-## Детальний опис модулів
+## Модулі
 
 ### `parser/manager.py`
 
@@ -102,9 +106,9 @@ bank-statement-to-accounting-book-parser/
 
 | Метод | Опис |
 |-------|------|
-| `__init__(input_dir, output_dir)` | Ініціалізація з папками input/output |
-| `run()` | Запуск парсингу всіх PDF у папці input |
-| `process_file(pdf_file)` | Обробка одного PDF файлу |
+| `__init__(input_dir, output_dir)` | Папки input/output |
+| `run()` | Парсинг усіх PDF у папці input (`.pdf` без урахування регістру, за алфавітом; другий файл, що записав би той самий CSV, пропускається). Повертає `False`, якщо папка input непридатна або якийсь файл не оброблено; `main.py` робить з цього код виходу 1 |
+| `process_file(pdf_file)` | Обробка одного PDF; `False` при помилці або якщо транзакцій не знайдено |
 | `_report_control_sum(transactions, control_sum)` | Звіт про збіг контрольної суми та комісії |
 | `_write_csv(pdf_file, transactions)` | Запис CSV з назвою PDF |
 
@@ -114,7 +118,7 @@ bank-statement-to-accounting-book-parser/
 3. Отримує новий парсер через `BankDetector.get_parser()`
 4. `parser.parse(pdf)` та `parser.extract_control_sum(pdf)`
 5. Виводить попередження парсера (`parser.warnings`, напр. неузгоджена комісія)
-6. Порівнює контрольну суму із сумою `net_amount` — зарахованого (допуск `CONTROL_SUM_TOLERANCE` = 0.01) — лише попередження, CSV записується в будь-якому разі
+6. Порівнює контрольну суму із сумою `net_amount` (зараховане; допуск `CONTROL_SUM_TOLERANCE` = 0.01). Розбіжність — лише попередження, CSV записується в будь-якому разі
 7. Записує CSV через `CSVWriter.write()`
 
 Помилка в одному файлі виводиться з traceback, обробка решти продовжується.
@@ -137,6 +141,8 @@ bank-statement-to-accounting-book-parser/
 - `novapay`, `новапей`, `935871` → NovaPayParser
 - інше → GenericParser
 
+Про хибні збіги див. [відому проблему #2](KNOWN_ISSUES.uk.md#2-банк-визначається-за-будь-яким-збігом-на-першій-сторінці-включно-з-контрагентами).
+
 ---
 
 ### `parser/core/statement.py`
@@ -147,7 +153,7 @@ bank-statement-to-accounting-book-parser/
 |------|-----|------|
 | `date` | `datetime` | Дата та час транзакції |
 | `gross_amount` | `float` | Сума до вирахування комісії |
-| `commission` | `float` | Комісія банку (0 за замовчуванням) |
+| `commission` | `float` | Комісія (0 за замовчуванням) |
 | `net_amount` | `float` | Сума після комісії (якщо не вказано — `gross - commission`) |
 
 `amount` — властивість для зворотної сумісності, повертає `gross_amount`.
@@ -171,6 +177,13 @@ bank-statement-to-accounting-book-parser/
 | `extract_control_sum(pdf)` | Шукає `CONTROL_SUM_PATTERN` на `CONTROL_SUM_PAGE` |
 | `_extract_date(value)` | `dates.extract_datetime(value, DATE_FORMATS)` |
 | `_extract_amount(value)` | `validators.extract_and_validate_amount(value, DECIMAL_COMMA)` — **фільтрує негативні суми** |
+| `_make_transaction(date, net, details)` | `Transaction` з gross/комісією з опису, якщо вони узгоджені |
+
+**Комісія (`_make_transaction`).** Сума у виписці — зараховане (net). В описі можуть бути сума до комісії та комісія:
+- переказ від платіжної системи: `(сума X грн, комісія - Y грн)` — `TRANSFER_COMMISSION_PATTERN` (ПриватБанк, Монобанк)
+- еквайринг Монобанку: `Загалом X грн. Комісія банку Y грн.` — `GROSS_AMOUNT_PATTERN` / `COMMISSION_PATTERN`
+
+Приймаються лише якщо `X − Y == net` (±0.01), інакше `gross = net` і попередження. Попередження й тоді, коли комісію згадано в нерозпізнаному форматі. У PDF українські слова можуть містити латинську `i`; шаблони це враховують.
 
 ---
 
@@ -182,12 +195,14 @@ bank-statement-to-accounting-book-parser/
 1. Шукає перший рядок, для якого `_is_header(row_text)` істинне
 2. `_detect_columns(row, columns)` повертає індекси колонок; знайдені зберігаються в `_saved_columns`
 3. Таблиці без заголовка (наступні сторінки) використовують збережені індекси та парсяться з першого рядка
-4. Якщо немає колонок з `REQUIRED_COLUMNS` (`date`, `amount`) — таблиця пропускається
+4. Якщо немає колонок з `REQUIRED_COLUMNS` (`date`, `amount`), таблиця пропускається
 5. Для кожного рядка `_build_transaction(cells)` повертає `Transaction` або `None`
 
-Через збережені колонки екземпляр парсера використовується лише для одного файлу (`get_parser` завжди створює новий).
+Через збережені колонки екземпляр парсера обслуговує лише один файл (`get_parser` завжди створює новий).
 
-`_find_column_indices(row, keywords)` — пошук колонок за ключовими словами; для `amount` колонки з "валют" мають нижчий пріоритет.
+`_extract_tables(page)` додає горизонтальну лінію по низу вертикальних ліній, щоб рядок, розірваний розривом сторінки (без нижньої межі), не губився.
+
+`_find_column_indices(row, keywords)` — пошук колонок за ключовими словами; для `amount` колонки з «валют» мають нижчий пріоритет.
 
 ---
 
@@ -199,7 +214,7 @@ bank-statement-to-accounting-book-parser/
 - Рядок транзакції: `<номер> DD.MM.YYYY <сума> <призначення>` (`PRIVATBANK_TXN_LINE_PATTERN`)
 - Час `HH:MM` — з наступного рядка (`PRIVATBANK_TIME_PATTERN`)
 - Контрольна сума: `разом за кредитом: XXX` (перша сторінка)
-- **Комісія платіжної системи:** «Призначення платежу» збирається зі слів `extract_words()` між вертикальними лініями таблиці праворуч від суми (`_page_descriptions`; у тексті сторінки колонки перемішані). Рядок транзакції починається словом-датою, за яким іде сума (`_row_anchors`). Далі `_make_transaction` (див. нижче)
+- **Комісія платіжної системи:** «Призначення платежу» збирається зі слів `extract_words()` між вертикальними лініями таблиці праворуч від суми (`_page_descriptions`), бо `extract_text()` перемішує колонки. Рядок транзакції починається словом-датою, за яким іде сума (`_row_anchors`). Далі — `_make_transaction`
 
 ---
 
@@ -208,9 +223,10 @@ bank-statement-to-accounting-book-parser/
 **Клас:** `MonobankParser(TableParser)`
 
 - Заголовок: рядок з `дата`, `сума`, `операц`
-- Колонки: `дата`+`час`, `сума`+`операц` (уникає "Сума у валюті …"), `деталі`
+- Колонки: `дата`+`час`, `сума`+`операц` (уникає «Сума у валюті …»), `деталі`
+- Заголовок повністю визначає колонки таблиці (відсутні стають `None`)
 - Контрольна сума: `Обіг за кредитом за період: XXX UAH` (перша сторінка)
-- **Комісія:** з "Деталі операції" — еквайринг (`Загалом X грн. Комісія банку Y грн.`) або переказ від платіжної системи (`(сума X грн, комісія - Y грн.)`). Тоді `gross = X`, `commission = Y`, `net` = сума з таблиці, якщо `X − Y == net` (`BaseParser._make_transaction`)
+- **Комісія:** з «Деталі операції» — еквайринг або переказ від платіжної системи, через `_make_transaction`
 
 ---
 
@@ -221,6 +237,7 @@ bank-statement-to-accounting-book-parser/
 - `DECIMAL_COMMA = True` — суми `1 234,56`
 - `DATE_FORMATS`: спочатку `dd.mm.yyyy HH:MM` (без секунд), потім з секундами, потім лише дата
 - Заголовок: `дата` + `сума`; колонки `Дата/час операції`, `Сума, UAH`
+- Колонки, яких немає в заголовку, лишаються збереженими
 - Контрольна сума: `Обороти по кредиту: XXX грн` (**остання** сторінка)
 - Комісії немає
 
@@ -232,13 +249,13 @@ bank-statement-to-accounting-book-parser/
 
 - Сканує всі рядки таблиць, бере першу дату і першу суму в рядку
 - Без контрольної суми
-- Відома проблема: сума може бути взята з комірки з датою (`15.01.2024` → `15,01`)
+- Відома проблема: сума може бути взята з комірки з датою (`15.01.2024` → `15,01`), див. [#3](KNOWN_ISSUES.uk.md#3-загальний-парсер-бере-суму-з-дати-часу-або-номера-рядка)
 
 ---
 
 ### `parser/io/pdf_reader.py`
 
-`PDFReader.open(pdf_path)` — context manager над `pdfplumber.open()`. Помилка відкриття загортається у `Exception("Помилка відкриття PDF файлу ...")`; помилки всередині блоку `with` прокидаються без змін.
+`PDFReader.open(pdf_path)` — context manager над `pdfplumber.open()`. Помилка відкриття загортається в `Exception("Cannot open PDF file ...")`; помилки всередині блоку `with` прокидаються без змін.
 
 ---
 
@@ -251,9 +268,10 @@ bank-statement-to-accounting-book-parser/
 07:15:00,05.08.2026,"250,00","0,00","250,00"
 ```
 
-- Транзакції у **зворотному порядку** (reversed відносно порядку парсингу)
-- Кодування UTF-8 з BOM (`utf-8-sig`) для Excel
-- Суми в європейському форматі (кома), тому поля сум у лапках
+- Заголовки колонок українською навмисно: це колонки Книги обліку
+- Рядки у **зворотному** порядку парсингу: хронологічно для виписок «від нових до старих». Перевірено лише для ПриватБанку ([#11](KNOWN_ISSUES.uk.md#11-порядок-рядків-у-csv-залежить-від-порядку-у-виписці-потенційно))
+- UTF-8 з BOM (`utf-8-sig`) для Excel
+- Кома як десятковий розділювач, тому поля сум у лапках
 
 ---
 
@@ -263,10 +281,10 @@ bank-statement-to-accounting-book-parser/
 |-------|------|
 | `DATE_PATTERN`, `DATETIME_PATTERN`, `DATETIME_PATTERN_SHORT` | Regex дат (з секундами / без) |
 | `AMOUNT_PATTERN`, `WHITESPACE_PATTERN` | Regex суми та пробілів (з nbsp) |
-| `GROSS_AMOUNT_PATTERN`, `COMMISSION_PATTERN` | Еквайринг Monobank |
-| `TRANSFER_COMMISSION_PATTERN` | Переказ від платіжної системи `(сума X грн, комісія - Y грн)` (PrivatBank, Monobank) |
+| `GROSS_AMOUNT_PATTERN`, `COMMISSION_PATTERN` | Еквайринг Монобанку |
+| `TRANSFER_COMMISSION_PATTERN` | Переказ від платіжної системи `(сума X грн, комісія - Y грн)` (ПриватБанк, Монобанк) |
 | `*_CONTROL_SUM_PATTERN` | Контрольні суми банків |
-| `PRIVATBANK_TXN_LINE_PATTERN`, `PRIVATBANK_TIME_PATTERN` | Текстовий розбір PrivatBank |
+| `PRIVATBANK_TXN_LINE_PATTERN`, `PRIVATBANK_TIME_PATTERN` | Текстовий розбір ПриватБанку |
 | `MIN_AMOUNT` / `MAX_AMOUNT` | Межі валідних сум |
 | `CONTROL_SUM_TOLERANCE` | Допуск розбіжності контрольної суми |
 | `*_KEYWORDS` | Ключові слова банків |
@@ -282,13 +300,13 @@ bank-statement-to-accounting-book-parser/
 | `is_negative_amount(amount_str)` | Мінус (`-`, `−`, `–`) на початку або дужки |
 | `is_valid_amount(amount)` | Межі `MIN_AMOUNT..MAX_AMOUNT` |
 | `extract_and_validate_amount(amount_str, decimal_comma=False)` | `None` для негативних, поза межами, невалідних |
-| `to_float(number_str, decimal_comma=False)` | Число з тексту виписки (контрольна сума, деталі); `ValueError` якщо не число |
+| `to_float(number_str, decimal_comma=False)` | Число з тексту виписки (контрольна сума, деталі); `ValueError`, якщо не число |
 
 ---
 
 ### `parser/utils/dates.py`
 
-`extract_datetime(value, formats=DEFAULT_FORMATS)` — пробує формати `(regex, strptime)` по черзі. Готові формати: `DATETIME_FULL`, `DATETIME_SHORT`, `DATE_ONLY`; `DEFAULT_FORMATS = (DATETIME_FULL, DATE_ONLY)`.
+`extract_datetime(value, formats=DEFAULT_FORMATS)` пробує формати `(regex, strptime)` по черзі. Готові формати: `DATETIME_FULL`, `DATETIME_SHORT`, `DATE_ONLY`; `DEFAULT_FORMATS = (DATETIME_FULL, DATE_ONLY)`.
 
 ---
 
@@ -298,7 +316,7 @@ bank-statement-to-accounting-book-parser/
 |---------|------|
 | `format_date(date, fmt)` | `dd.mm.yyyy` |
 | `format_time(date)` | `HH:MM:SS` |
-| `format_amount(amount)` | Європейський формат (кома) |
+| `format_amount(amount)` | Кома як десятковий розділювач |
 | `format_csv_row(transaction)` | Рядок CSV з 5 колонок |
 
 ---
@@ -338,7 +356,18 @@ output/statement.csv
 
 ---
 
-## Як додати новий банк
+## Архітектурні рішення
+
+- **Фільтрація доходів під час розбору суми.** `validators.extract_and_validate_amount` повертає `None` для рядків, що починаються з мінуса (`-`, `−` U+2212, `–` U+2013) або взяті в дужки; парсери пропускають `None`. Ніколи не робіть `float()` з комірки напряму.
+- **Контрольна сума — головний сигнал коректності.** Кожен відомий банк друкує обіг за кредитом; порівняння з сумою розпарсених net-сум ловить пропущені чи зайві рядки. Розбіжність — попередження, а не помилка: користувачу все одно потрібен CSV, щоб виправити вручну.
+- **Декларативні парсери.** Відмінності банків — в атрибутах класу та `constants.py`, тож новий табличний банк — переважно конфігурація.
+- **Текстовий розбір для ПриватБанку.** Розбір таблиць губив рядки на розривах сторінок; рядки тексту плюс координати слів до цього стійкі.
+- **Монобанк і NovaPay навмисно по-різному обробляють заголовок.** Заголовок Монобанку замінює всі колонки, NovaPay зберігає попередні.
+- **Новий парсер на кожен файл.** Табличні парсери зберігають стан колонок між сторінками.
+
+---
+
+## Як додати банк
 
 ### 1. Константи в `utils/constants.py`
 
@@ -347,13 +376,12 @@ NEWBANK_KEYWORDS = ['новий банк', 'newbank']
 NEWBANK_CONTROL_SUM_PATTERN = r'Оборот по кредиту:\s*([\d\s]+\.?\d*)'
 ```
 
-### 2. Парсер в `parsers/newbank_parser.py`
+### 2. Парсер у `parsers/newbank_parser.py`
 
 Для таблиць із заголовком — наслідуйте `TableParser`:
 
 ```python
 from ..core.table_parser import TableParser
-from ..core.statement import Transaction
 from ..utils import constants
 
 
@@ -371,11 +399,11 @@ class NewBankParser(TableParser):
         date_obj = self._extract_date(cells.get('date'))
         amount = self._extract_amount(cells.get('amount'))
         if date_obj and amount:
-            return Transaction(date=date_obj, gross_amount=amount)
+            return self._make_transaction(date_obj, amount)
         return None
 ```
 
-Для іншого формату (наприклад, текстового, як PrivatBank) — наслідуйте `BaseParser` і реалізуйте `parse(pdf)`.
+Для іншого формату (наприклад, текстового, як ПриватБанк) — наслідуйте `BaseParser` і реалізуйте `parse(pdf)`.
 
 ### 3. Зареєструвати в `bank_detector.py`
 
@@ -386,7 +414,9 @@ BANKS = (
 )
 ```
 
-### 4. Експорт в `parsers/__init__.py`, тест у `tests/test_parsers.py`, перевірка на реальній виписці (має бути "Контрольна сума співпадає").
+### 4. Завершення
+
+Експорт у `parsers/__init__.py`, тест у `tests/test_parsers.py`, перевірка на реальній виписці локально: має бути «Control sum matches».
 
 ---
 
@@ -396,11 +426,11 @@ BANKS = (
 python -m unittest discover -s tests -t .
 ```
 
-Тести використовують підробні сторінки (`tests/fakes.py`) з синтетичними даними — реальні виписки в репозиторій не додаються.
+Тести використовують підробні сторінки (`tests/fakes.py` імітує `pages`, `extract_text()`, `extract_tables()`, `extract_words()`, `edges` pdfplumber) із синтетичними даними. Реальні виписки в репозиторій не додаються.
 
 ---
 
 ## Залежності
 
-- **pdfplumber** — парсинг PDF та витягування таблиць/тексту
-- **Python 3.7+** — dataclasses, type hints
+- **pdfplumber** — витягування тексту, таблиць і слів з PDF
+- **Python 3.10+**

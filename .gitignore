@@ -23,9 +23,21 @@ wheels/
 .installed.cfg
 *.egg
 
-# Робочі папки
-input/*.pdf
-output/*.csv
+# Working folders: real statements and ledgers are personal financial data.
+# Ignore everything inside them (any extension, any nesting) except the placeholders.
+input/*
+!input/.gitkeep
+output/*
+!output/.gitkeep
+
+# Tooling
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.idea/
+.vscode/
+*.swp
 
 # OS
 .DS_Store
@@ -36,5 +48,5 @@ output/*.csv
 ehthumbs.db
 Thumbs.db
 
-# Claude memory bank (local-only, see CLAUDE.md)
-.claude/memory_bank/
+# Claude Code local settings
+.claude/settings.local.json

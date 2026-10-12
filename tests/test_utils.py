@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Тести утиліт: суми, дати, форматування CSV."""
+"""Utility tests: amounts, dates, CSV formatting."""
 
 import unittest
 from datetime import datetime
@@ -23,6 +23,7 @@ class AmountTest(unittest.TestCase):
     def test_to_float(self):
         self.assertEqual(validators.to_float('12 345.67'), 12345.67)
         self.assertEqual(validators.to_float('12\xa0345,67', decimal_comma=True), 12345.67)
+        self.assertEqual(validators.to_float('12\u202f345.67'), 12345.67)
         with self.assertRaises(ValueError):
             validators.to_float('12\n34')
 

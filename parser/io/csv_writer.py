@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Генерація CSV файлів для Книги обліку доходів
+CSV generation for the income ledger ("Книга обліку доходів").
 """
 
 import csv
@@ -10,35 +10,35 @@ from ..utils import constants, formatters
 
 
 class CSVWriter:
-    """Генерація CSV файлів."""
+    """Writes ledger CSV files."""
 
     @staticmethod
     def write(transactions: List[Transaction], output_path: str) -> None:
         """
-        Записує транзакції у CSV файл.
+        Writes transactions to a CSV file.
 
-        Структура CSV (5 колонок):
-        1. Час
-        2. Дата
-        3. Сума (gross - до комісії)
-        4. Комісія
-        5. Сума з врахуванням комісії (net - після комісії)
+        CSV layout (5 columns, Ukrainian headers as required by the ledger):
+        1. Час - time
+        2. Дата - date
+        3. Сума - gross amount (before commission)
+        4. Комісія - commission
+        5. Сума з врахуванням комісії - net amount (after commission)
 
-        Транзакції записуються у зворотному порядку (reversed).
+        Transactions are written in reverse parse order. That is chronological only for
+        newest-first statements (verified for PrivatBank only, see docs/KNOWN_ISSUES.md #11).
 
         Args:
-            transactions: Список транзакцій
-            output_path: Шлях до вихідного CSV файлу
+            transactions: Transactions to write
+            output_path: Path to the output CSV file
         """
         with open(output_path, 'w', newline='', encoding=constants.CSV_ENCODING) as csvfile:
             writer = csv.writer(csvfile)
 
-            # Записуємо заголовки
             writer.writerow(formatters.CSV_HEADERS)
 
-            # Записуємо транзакції у зворотному порядку
+            # Chronological for newest-first statements; unverified for Monobank/NovaPay (KNOWN_ISSUES #11)
             for trans in reversed(transactions):
                 row = formatters.format_csv_row(trans)
                 writer.writerow(row)
 
-        print(f"CSV файл створено: {output_path}")
+        print(f"CSV written: {output_path}")

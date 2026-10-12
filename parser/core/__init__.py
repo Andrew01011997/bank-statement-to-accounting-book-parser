@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Базові класи та моделі даних."""
+"""Base classes and data model."""
 
 from .base_parser import BaseParser
 from .table_parser import TableParser

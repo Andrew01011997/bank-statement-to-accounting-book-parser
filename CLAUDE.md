@@ -4,18 +4,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Parses Ukrainian bank-statement PDFs (PrivatBank, Monobank, NovaPay, generic fallback) and produces CSV files for the FOP income ledger ("Книга обліку доходів"). Only **income** (positive amounts) is kept; expenses are dropped. User-facing output, comments and docs are in Ukrainian — keep that convention.
+Parses Ukrainian bank-statement PDFs (PrivatBank, Monobank, NovaPay, generic fallback) and produces CSV files for the FOP income ledger ("Книга обліку доходів"). Only **income** (positive amounts) is kept; expenses are dropped.
+
+Language: code, comments, docstrings, console output and commit messages are in English. Keywords/regexes matching statement text and the CSV headers stay Ukrainian. Every `.md` document except this file and the `.github/` templates has an English version (`X.md`) and a Ukrainian one (`X.uk.md`) — keep both in sync. GitHub issue/PR templates can't be split by language, so they are bilingual within one file.
 
 ## Commands
 
 ```bash
-pip install -r requirements.txt               # only dependency: pdfplumber (a local venv/ is gitignored)
+pip install -r requirements-dev.txt           # pdfplumber + ruff (a local venv/ is gitignored)
 python main.py                                # processes every input/*.pdf -> output/<same-name>.csv
 python -m unittest discover -s tests -t .     # all tests
 python -m unittest tests.test_parsers.NovaPayParserTest.test_parse   # single test
+ruff check .                                  # lint (config in pyproject.toml)
 ```
 
-`run.bat` / `run.sh` wrap `main.py` and auto-install deps. No linter or build step. Tests use synthetic fake pages (`tests/fakes.py` mimics pdfplumber's `pages` / `extract_text()` / `extract_tables()`); real statements are still the final check — run `main.py` and look for "Контрольна сума співпадає". `input/*.pdf` and `output/*.csv` are gitignored — never commit statements or put real statement data into tests (personal financial data).
+`run.bat` / `run.sh` wrap `main.py` and auto-install deps. No build step; CI (`.github/workflows/ci.yml`) runs ruff once (Ubuntu, Python 3.13) and the tests on Linux/Windows/macOS with Python 3.10 and 3.13. `main.py` exits 1 if the input folder is unusable or any file fails (error, no transactions, or a CSV name clash); `run.bat --no-pause` skips the final pause. Tests use synthetic fake pages (`tests/fakes.py` mimics pdfplumber's `pages` / `extract_text()` / `extract_tables()`); real statements are still the final check — run `main.py` and look for "Control sum matches". Everything in `input/` and `output/` is gitignored — never commit statements or put real statement data into tests (personal financial data).
 
 ## Architecture
 
@@ -41,22 +44,4 @@ Cross-cutting rules:
 - NovaPay: comma decimals, dates without seconds tried first, control sum on the **last** page.
 - All regexes, keywords and limits live in `parser/utils/constants.py`.
 
-Adding a bank: keywords + control-sum regex in `constants.py`; subclass `TableParser` (or `BaseParser` for non-table formats); add a `BANKS` entry; export from `parser/parsers/__init__.py`; add a test in `tests/test_parsers.py`. Record changes in `.claude/CHANGELOG.md`; detailed technical docs live in `.claude/DOCS.md`; known bugs, prioritised P1–P3 with repro steps, are in `.claude/BUGS.md` (update it when fixing one).
-
-## Memory Bank System
-
-This project uses the [claude-memory-bank](https://github.com/russbeye/claude-memory-bank) system (agents in `.claude/agents/`, commands in `.claude/commands/context/`, workflows in `.claude/workflows/memory-bank/`). Check the memory bank for relevant context before starting work.
-
-Granular files (authoritative for day-to-day work):
-
-- `.claude/memory_bank/decisions/**` — ADRs and trade-offs
-- `.claude/memory_bank/patterns/**` — cross-cutting patterns and conventions
-- `.claude/memory_bank/architecture/**` — module topology and data flow
-- `.claude/memory_bank/troubleshooting/**` — known issues and proven fixes
-- `.claude/memory_bank/stash/**` — temporary scratch pad (read only when referenced)
-
-Rules:
-
-- Context order: memory bank → `code-searcher` agent → archive (last resort). Use `/context-query` with path scopes and a small `--limit`.
-- `.claude/memory_bank/archive/**` is read-only historical snapshots; never modify it and don't load it for routine tasks.
-- After meaningful code changes run `/context-diff` (delta) or `/update-memory-bank`; `/stale-context-check` for hygiene; `/cleanup-context` to snapshot milestones.
+Adding a bank: keywords + control-sum regex in `constants.py`; subclass `TableParser` (or `BaseParser` for non-table formats); add a `BANKS` entry; export from `parser/parsers/__init__.py`; add a test in `tests/test_parsers.py`. Record changes in `CHANGELOG.md` + `CHANGELOG.uk.md`; detailed technical docs live in `docs/ARCHITECTURE.md`; known bugs, prioritised P1–P3 with repro steps, are in `docs/KNOWN_ISSUES.md` (update both language versions when fixing one).

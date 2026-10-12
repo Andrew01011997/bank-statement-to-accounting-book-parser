@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Розбір, валідація та фільтрація сум для парсера банківських виписок.
-Негативні суми (витрати) відсіюються тут — парсери пропускають None.
+Amount parsing, validation and filtering.
+Negative amounts (expenses) are filtered out here; parsers skip None.
 """
 
 from typing import Optional
@@ -11,27 +11,26 @@ from . import constants
 
 def is_negative_amount(amount_str: str) -> bool:
     """
-    Перевіряє наявність знака мінуса ПЕРЕД парсингом числа.
+    Detects a minus sign BEFORE the number is parsed.
 
-    Розпізнає:
+    Recognises:
     - "-1200.50" (hyphen-minus)
     - "−500" (minus sign, U+2212)
     - "–300" (en dash, U+2013)
-    - "(1200)" (бухгалтерський формат)
+    - "(1200)" (accounting format)
 
     Args:
-        amount_str: Рядок з сумою для перевірки
+        amount_str: Amount string to check
 
     Returns:
-        True якщо знайдено знак мінуса, False інакше
+        True if a minus sign was found, False otherwise
     """
     cleaned = amount_str.strip()
 
-    # Перевіряємо префіксні знаки мінуса
     if any(cleaned.startswith(sign) for sign in constants.MINUS_SIGNS):
         return True
 
-    # Дужки (бухгалтерський формат)
+    # Parentheses (accounting format)
     if cleaned.startswith('(') and cleaned.endswith(')'):
         return True
 
@@ -40,33 +39,33 @@ def is_negative_amount(amount_str: str) -> bool:
 
 def is_valid_amount(amount: float) -> bool:
     """
-    Перевіряє, чи сума в допустимих межах.
+    Checks that an amount is within bounds.
 
     Args:
-        amount: Числове значення суми
+        amount: Numeric amount
 
     Returns:
-        True якщо сума в межах MIN_AMOUNT та MAX_AMOUNT
+        True if MIN_AMOUNT <= amount <= MAX_AMOUNT
     """
     return constants.MIN_AMOUNT <= amount <= constants.MAX_AMOUNT
 
 
 def extract_and_validate_amount(amount_str: str, decimal_comma: bool = False) -> Optional[float]:
     """
-    Комбінована функція: витягує та валідує суму.
+    Extracts and validates an amount.
 
-    Алгоритм:
-    1. Перевіряє на негативність (за знаком у рядку)
-    2. Очищує whitespace (і замінює кому на крапку, якщо decimal_comma)
-    3. Витягує число
-    4. Валідує межі
+    Steps:
+    1. Reject negatives (by the sign in the string)
+    2. Strip whitespace (and turn the comma into a dot if decimal_comma)
+    3. Extract the number
+    4. Check bounds
 
     Args:
-        amount_str: Рядок з сумою
-        decimal_comma: True якщо кома - десятковий розділювач ("1 234,56")
+        amount_str: Amount string
+        decimal_comma: True if a comma is the decimal separator ("1 234,56")
 
     Returns:
-        float якщо валідна позитивна сума, інакше None
+        float for a valid positive amount, otherwise None
     """
     if not amount_str or is_negative_amount(amount_str):
         return None
@@ -88,20 +87,21 @@ def extract_and_validate_amount(amount_str: str, decimal_comma: bool = False) ->
 
 def to_float(number_str: str, decimal_comma: bool = False) -> float:
     """
-    Перетворює суму з тексту виписки (контрольна сума, деталі операції) на float.
-    Прибирає пробіли-роздільники тисяч (звичайні та нерозривні). Знак не перевіряється.
+    Converts an amount from statement text (control sum, transaction details) to float.
+    Removes space thousands separators (regular, no-break U+00A0, narrow no-break U+202F).
+    The sign is not checked.
 
     Args:
-        number_str: Рядок з числом ("12 345.67" або "12 345,67")
-        decimal_comma: True якщо кома - десятковий розділювач
+        number_str: Number string ("12 345.67" or "12 345,67")
+        decimal_comma: True if a comma is the decimal separator
 
     Returns:
         float
 
     Raises:
-        ValueError: Якщо рядок не є числом
+        ValueError: If the string is not a number
     """
-    cleaned = number_str.replace(' ', '').replace('\xa0', '')
+    cleaned = re.sub(constants.THOUSANDS_SEPARATOR_PATTERN, '', number_str)
     if decimal_comma:
         cleaned = cleaned.replace(',', '.')
     return float(cleaned)

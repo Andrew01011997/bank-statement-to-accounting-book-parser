@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Утиліти для парсера."""
+"""Parser utilities."""
 
 from . import constants
 from . import validators

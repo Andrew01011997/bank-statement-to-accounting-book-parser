@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Визначення типу банку та створення відповідного парсера (Factory Pattern)
+Bank detection and parser creation (Factory Pattern).
 """
 
 import pdfplumber
@@ -14,8 +14,8 @@ from .utils import constants
 
 UNKNOWN_BANK = 'unknown'
 
-# Реєстр банків: (тип, ключові слова на першій сторінці, клас парсера).
-# Порядок має значення - перевіряється по черзі, перший збіг перемагає.
+# Bank registry: (type, first-page keywords, parser class).
+# Order matters: banks are checked in turn and the first match wins.
 BANKS = (
     ('monobank', constants.MONOBANK_KEYWORDS, MonobankParser),
     ('privatbank', constants.PRIVATBANK_KEYWORDS, PrivatBankParser),
@@ -24,12 +24,12 @@ BANKS = (
 
 
 class BankDetector:
-    """Визначення типу банку та створення відповідного парсера (Factory Pattern)."""
+    """Detects the bank of a statement and creates the matching parser (Factory Pattern)."""
 
     @staticmethod
     def detect_from_pdf(pdf) -> str:
         """
-        Визначає тип банку за текстом першої сторінки відкритого PDF.
+        Detects the bank from the first page text of an open PDF.
 
         Returns:
             'monobank' | 'privatbank' | 'novapay' | 'unknown'
@@ -51,7 +51,7 @@ class BankDetector:
     @staticmethod
     def detect(pdf_path: str) -> str:
         """
-        Визначає тип банку за вмістом PDF файлу.
+        Detects the bank from a PDF file on disk.
 
         Returns:
             'monobank' | 'privatbank' | 'novapay' | 'unknown'
@@ -65,8 +65,8 @@ class BankDetector:
     @staticmethod
     def get_parser(bank_type: str) -> BaseParser:
         """
-        Повертає новий екземпляр парсера для типу банку (Factory Method).
-        Невідомий тип -> GenericParser.
+        Returns a new parser instance for the bank type (Factory Method).
+        Unknown type -> GenericParser.
         """
         for registered_type, _, parser_class in BANKS:
             if registered_type == bank_type:
