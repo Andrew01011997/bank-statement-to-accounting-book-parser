@@ -12,7 +12,7 @@ DATETIME_PATTERN_SHORT = r'(\d{2}\.\d{2}\.\d{4})\s+(\d{2}:\d{2})'  # Date and ti
 
 # Amount regexes
 AMOUNT_PATTERN = r'(\d+(?:\.\d{2})?)'
-WHITESPACE_PATTERN = r'[\s\xa0 ]'
+WHITESPACE_PATTERN = r'\s'  # Unicode-aware: also matches no-break spaces (U+00A0, U+202F)
 
 # Acquiring commission (Monobank)
 GROSS_AMOUNT_PATTERN = r'Загалом\s+([\d\s]+\.?\d*)\s*грн'  # "Загалом 1000.00 грн"

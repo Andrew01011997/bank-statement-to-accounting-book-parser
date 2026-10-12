@@ -25,7 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Fixed
 - `.gitignore` ignores everything in `input/` and `output/` (subfolders, `.PDF`, `.xlsx`) so real statements cannot be committed (KNOWN_ISSUES #9)
 - Launcher scripts work from any folder and install dependencies with `python -m pip` (KNOWN_ISSUES #12)
-- `*.PDF` is found on Linux and macOS; files are processed in sorted order (KNOWN_ISSUES #13)
+- `*.PDF` is found on Linux and macOS; files are processed in the same case-insensitive name order on every OS (KNOWN_ISSUES #13)
 - Output redirected to a file, pipe or scheduler on Windows (cp1251/cp1252) no longer breaks processing: `main.py` switches `stdout`/`stderr` to UTF-8 at startup (`configure_console()`) (KNOWN_ISSUES #1)
 - **Payment-system commissions** for PrivatBank and Monobank. Credits like "Переказ коштів … (сума X грн, комісія - Y грн.)" used to go into the ledger net of commission. Now `Сума` = X, `Комісія` = Y, `Сума з врахуванням комісії` = credited amount
 - Monobank: the last table row on a page without a bottom border was lost (control sum mismatch). `TableParser._extract_tables` closes the table with a line at the bottom of the vertical edges

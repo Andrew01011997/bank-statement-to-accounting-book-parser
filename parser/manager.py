@@ -32,13 +32,14 @@ class StatementParserManager:
         """Parses every PDF in the input folder."""
         print("=== Bank statement parser ===\n")
 
-        if not self.input_dir.exists():
+        if not self.input_dir.is_dir():
             print(f"❌ Folder {self.input_dir} does not exist!")
             return
 
-        # Case-insensitive extension (*.PDF on Linux/macOS), stable order
-        pdf_files = sorted(p for p in self.input_dir.iterdir()
-                           if p.is_file() and p.suffix.lower() == '.pdf')
+        # Case-insensitive extension (*.PDF on Linux/macOS) and the same order on every OS
+        pdf_files = sorted((p for p in self.input_dir.iterdir()
+                            if p.is_file() and p.suffix.lower() == '.pdf'),
+                           key=lambda p: (p.name.casefold(), p.name))
 
         if not pdf_files:
             print(f"❌ No PDF files found in {self.input_dir}")

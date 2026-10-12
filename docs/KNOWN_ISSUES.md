@@ -115,7 +115,7 @@ Priorities:
 - **Before:** running from another folder or a shortcut failed with "input folder does not exist"; `pip` could install into a different Python; Ukrainian messages in `run.bat` were garbled in `cmd` (code page 866).
 
 ### 13. ✅ FIXED — Input file discovery and order
-- **Status:** fixed. `StatementParserManager.run` matches `*.pdf` case-insensitively and processes files in sorted order. Test: `tests/test_manager.py`.
+- **Status:** fixed. `StatementParserManager.run` matches `*.pdf` case-insensitively and processes files in case-insensitive name order, the same on every OS. A missing or non-directory `input` prints a message instead of crashing. Test: `tests/test_manager.py`.
 - **Before:** `glob('*.pdf')` missed `*.PDF` on Linux and macOS; processing order was unsorted.
 
 ### 14. ✅ FIXED — Monobank: commission consistency was not checked

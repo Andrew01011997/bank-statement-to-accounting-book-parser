@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Parses Ukrainian bank-statement PDFs (PrivatBank, Monobank, NovaPay, generic fallback) and produces CSV files for the FOP income ledger ("Книга обліку доходів"). Only **income** (positive amounts) is kept; expenses are dropped.
 
-Language: code, comments, docstrings, console output and commit messages are in English. Keywords/regexes matching statement text and the CSV headers stay Ukrainian. Every `.md` document except this file has an English version (`X.md`) and a Ukrainian one (`X.uk.md`) — keep both in sync.
+Language: code, comments, docstrings, console output and commit messages are in English. Keywords/regexes matching statement text and the CSV headers stay Ukrainian. Every `.md` document except this file and the `.github/` templates has an English version (`X.md`) and a Ukrainian one (`X.uk.md`) — keep both in sync. GitHub issue/PR templates can't be split by language, so they are bilingual within one file.
 
 ## Commands
 

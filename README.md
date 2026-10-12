@@ -60,7 +60,7 @@ Column headers are in Ukrainian because they are the ledger's columns: time, dat
 - **Commission** is filled for Monobank acquiring and for payment-system transfers ("сума X грн, комісія Y грн") at PrivatBank and Monobank; otherwise it is `0`
 - **Encoding:** UTF-8 with BOM, so Excel opens it correctly
 - **Amounts:** comma as the decimal separator
-- **Order:** chronological (statements list newest first; the CSV is reversed)
+- **Order:** reverse of the statement, which is chronological for newest-first statements (verified for PrivatBank; see [known issue #11](docs/KNOWN_ISSUES.md#11-csv-row-order-depends-on-statement-order-potential))
 
 ## Verifying the result
 

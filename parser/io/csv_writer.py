@@ -24,7 +24,8 @@ class CSVWriter:
         4. Комісія - commission
         5. Сума з врахуванням комісії - net amount (after commission)
 
-        Transactions are written in reverse parse order.
+        Transactions are written in reverse parse order. That is chronological only for
+        newest-first statements (verified for PrivatBank only, see docs/KNOWN_ISSUES.md #11).
 
         Args:
             transactions: Transactions to write
@@ -35,7 +36,7 @@ class CSVWriter:
 
             writer.writerow(formatters.CSV_HEADERS)
 
-            # Statements list newest first, so reversing makes the CSV chronological
+            # Chronological for newest-first statements; unverified for Monobank/NovaPay (KNOWN_ISSUES #11)
             for trans in reversed(transactions):
                 row = formatters.format_csv_row(trans)
                 writer.writerow(row)

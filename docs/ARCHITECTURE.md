@@ -269,7 +269,7 @@ Because of the saved columns, a parser instance serves one file only (`get_parse
 ```
 
 - Column headers are Ukrainian on purpose: they are the ledger's columns (time, date, amount, commission, amount net of commission)
-- Rows in **reverse** parse order (statements are newest-first, so the CSV is chronological)
+- Rows in **reverse** parse order: chronological for newest-first statements. Verified for PrivatBank only ([#11](KNOWN_ISSUES.md#11-csv-row-order-depends-on-statement-order-potential))
 - UTF-8 with BOM (`utf-8-sig`) so Excel detects the encoding
 - Comma decimal separator, so amount fields are quoted
 
